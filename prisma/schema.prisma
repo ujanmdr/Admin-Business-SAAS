@@ -1,0 +1,57 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Represents a subscription tier/package created by a Super Admin
+model Package {
+  id            String             @id @default(cuid())
+  name          String             @unique
+  price         Decimal            @db.Decimal(10, 2)
+  billingPeriod BillingPeriod      @default(MONTHLY)
+  maxBranches   Int                // Upper limit on branches for the tenant
+  maxStaff      Int                // Upper limit on staff members for the tenant
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  // Relations
+  businesses    BusinessProfile[]
+
+  @@index([createdAt])
+}
+
+/// Represents a Tenant (Business Profile) subscribed to the B2B SaaS platform
+model BusinessProfile {
+  id                 String             @id @default(cuid())
+  name               String
+  email              String             @unique
+  currentPackageId   String?
+  subscriptionStatus SubscriptionStatus @default(ACTIVE)
+  nextBillingDate    DateTime
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  // Relations
+  currentPackage     Package?           @relation(fields: [currentPackageId], references: [id], onDelete: SetNull)
+
+  @@index([subscriptionStatus])
+  @@index([email])
+}
+
+enum BillingPeriod {
+  MONTHLY
+  YEARLY
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
