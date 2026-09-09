@@ -9,8 +9,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { branches } from "@/lib/nav";
 import {
   Building2, Clock, CalendarCheck, CreditCard, Bell, Shield, Globe2, Palette,
-  Upload, MapPin, Plus, Star, Trophy, Sparkles, Image as ImageIcon, Save, Check, Heart,
+  Upload, MapPin, Plus, Star, Trophy, Sparkles, Image as ImageIcon, Save, Check, Heart, ShoppingBag
 } from "lucide-react";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { LoyaltyProgramSettings } from "@/components/LoyaltyProgramSettings";
 import { SubscriptionSettings } from "@/components/SubscriptionSettings";
@@ -28,6 +31,7 @@ const TABS = [
   { v: "hours", label: "Hours", icon: Clock },
   { v: "booking", label: "Booking", icon: CalendarCheck },
   { v: "payment", label: "Payments", icon: CreditCard },
+  { v: "pos", label: "POS Settings", icon: ShoppingBag },
   { v: "subscription", label: "Subscription", icon: Star },
   { v: "loyalty", label: "Loyalty Program", icon: Heart },
   { v: "notifications", label: "Notifications", icon: Bell },
@@ -295,13 +299,17 @@ function SettingsPage() {
           <Section title="Tax & invoicing">
             <div className="grid md:grid-cols-3 gap-4">
               <Field label="Deposit percentage"><Input defaultValue="20%" /></Field>
-              <Field label="VAT (%)"><Input defaultValue="13" /></Field>
               <Field label="Invoice prefix"><Input defaultValue="AURA-" /></Field>
             </div>
             <Field label="Refund rules">
               <Textarea rows={3} defaultValue="Full refund if cancelled 24h before. 50% refund within 6h. No refund for no-shows." />
             </Field>
           </Section>
+        </TabsContent>
+
+        {/* POS SETTINGS */}
+        <TabsContent value="pos" className="space-y-6">
+          <PosSettings />
         </TabsContent>
 
         {/* LOYALTY PROGRAM */}
@@ -481,5 +489,93 @@ function ThemeGallerySection() {
         })}
       </div>
     </Section>
+  );
+}
+
+// ── POS Settings ───────────────────────────────────────
+function PosSettings() {
+  const [discountType, setDiscountType] = useState<"none" | "percentage" | "fixed">("percentage");
+  const [taxType, setTaxType] = useState<"vat" | "gst" | "sales_tax">("vat");
+
+  return (
+    <div className="space-y-6">
+      <Section title="Tax Configuration" description="Manage how taxes are applied to your services and products at checkout.">
+        <ToggleRow title="Include tax in prices" description="Prices shown to customers already include tax." defaultChecked />
+        
+        <div className="grid md:grid-cols-2 gap-4 mt-2">
+          <Field label="Tax Type">
+            <Select value={taxType} onValueChange={(v: any) => setTaxType(v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="vat">VAT (Value Added Tax)</SelectItem>
+                <SelectItem value="gst">GST (Goods & Services Tax)</SelectItem>
+                <SelectItem value="sales_tax">Sales Tax</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          <Field label="Tax Rate (basis points)" hint="e.g. 1300 for 13%, 500 for 5%">
+            <Input type="number" defaultValue="1300" />
+          </Field>
+        </div>
+      </Section>
+
+      <Section title="Default Discounts" description="Set default discounts to speed up checkout.">
+        <div className="grid md:grid-cols-2 gap-4">
+          <Field label="Default Discount Type">
+            <Select value={discountType} onValueChange={(v: any) => setDiscountType(v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No default discount</SelectItem>
+                <SelectItem value="percentage">Percentage (%)</SelectItem>
+                <SelectItem value="fixed">Fixed Amount</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          
+          {discountType !== "none" && (
+            <Field 
+              label={discountType === "percentage" ? "Default Discount (basis points)" : "Default Discount (minor units)"} 
+              hint={discountType === "percentage" ? "e.g. 1000 for 10%" : "e.g. 50000 for NPR 500"}
+            >
+              <Input type="number" defaultValue={discountType === "percentage" ? "1000" : "50000"} />
+            </Field>
+          )}
+        </div>
+      </Section>
+
+      <Section title="Staff & Checkout Flow" description="Control what happens during the checkout process.">
+        <ToggleRow 
+          title="Require Staff Selection" 
+          description="Force the cashier to select which staff member performed the service before collecting payment." 
+          defaultChecked 
+        />
+      </Section>
+
+      <Section title="Tipping & Gratuity" description="Allow customers to add tips when paying by card or digital wallet.">
+        <ToggleRow 
+          title="Enable Tipping" 
+          description="Prompt customers for a tip on the checkout screen." 
+          defaultChecked 
+        />
+        <div className="grid md:grid-cols-3 gap-4 mt-2">
+          <Field label="Tip Option 1 (%)"><Input type="number" defaultValue="5" /></Field>
+          <Field label="Tip Option 2 (%)"><Input type="number" defaultValue="10" /></Field>
+          <Field label="Tip Option 3 (%)"><Input type="number" defaultValue="15" /></Field>
+        </div>
+      </Section>
+
+      <Section title="Receipt Preferences" description="Choose how receipts are handled after a successful sale.">
+        <Field label="Auto-receipt behavior">
+          <Select defaultValue="ask">
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="print">Always print automatically</SelectItem>
+              <SelectItem value="ask">Always ask customer (Print / SMS / None)</SelectItem>
+              <SelectItem value="none">Never print (Go green)</SelectItem>
+            </SelectContent>
+          </Select>
+        </Field>
+      </Section>
+    </div>
   );
 }
