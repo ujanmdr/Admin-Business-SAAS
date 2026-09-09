@@ -20,6 +20,7 @@ import { SubscriptionSettings } from "@/components/SubscriptionSettings";
 import { useTheme } from "@/components/ThemeProvider";
 import { useTenantStore } from "@/store/tenant-store";
 import { mockBusinesses } from "@/lib/tenant-data";
+import { usePosStore } from "@/lib/pos-store";
 
 export const Route = createFileRoute("/business/settings")({
   head: () => ({ meta: [{ title: "Settings A BRG Suite" }] }),
@@ -494,17 +495,22 @@ function ThemeGallerySection() {
 
 // ── POS Settings ───────────────────────────────────────
 function PosSettings() {
-  const [discountType, setDiscountType] = useState<"none" | "percentage" | "fixed">("percentage");
-  const [taxType, setTaxType] = useState<"vat" | "gst" | "sales_tax">("vat");
+  const store = usePosStore();
 
   return (
     <div className="space-y-6">
       <Section title="Tax Configuration" description="Manage how taxes are applied to your services and products at checkout.">
-        <ToggleRow title="Include tax in prices" description="Prices shown to customers already include tax." defaultChecked />
+        <div className="flex items-start justify-between gap-4 py-3 border-b border-border last:border-0">
+          <div className="min-w-0">
+            <div className="text-sm font-medium">Include tax in prices</div>
+            <div className="text-xs text-muted-foreground mt-0.5">Prices shown to customers already include tax.</div>
+          </div>
+          <Switch checked={store.includeTax} onCheckedChange={(v) => store.updateSetting("includeTax", v)} />
+        </div>
         
-        <div className="grid md:grid-cols-2 gap-4 mt-2">
+        <div className="grid md:grid-cols-2 gap-4 mt-4">
           <Field label="Tax Type">
-            <Select value={taxType} onValueChange={(v: any) => setTaxType(v)}>
+            <Select value={store.taxType} onValueChange={(v: any) => store.updateSetting("taxType", v)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="vat">VAT (Value Added Tax)</SelectItem>
@@ -514,7 +520,7 @@ function PosSettings() {
             </Select>
           </Field>
           <Field label="Tax Rate (basis points)" hint="e.g. 1300 for 13%, 500 for 5%">
-            <Input type="number" defaultValue="1300" />
+            <Input type="number" value={store.taxRateBps} onChange={(e) => store.updateSetting("taxRateBps", Number(e.target.value))} />
           </Field>
         </div>
       </Section>
@@ -522,7 +528,7 @@ function PosSettings() {
       <Section title="Default Discounts" description="Set default discounts to speed up checkout.">
         <div className="grid md:grid-cols-2 gap-4">
           <Field label="Default Discount Type">
-            <Select value={discountType} onValueChange={(v: any) => setDiscountType(v)}>
+            <Select value={store.discountType} onValueChange={(v: any) => store.updateSetting("discountType", v)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">No default discount</SelectItem>
@@ -532,41 +538,57 @@ function PosSettings() {
             </Select>
           </Field>
           
-          {discountType !== "none" && (
+          {store.discountType !== "none" && (
             <Field 
-              label={discountType === "percentage" ? "Default Discount (basis points)" : "Default Discount (minor units)"} 
-              hint={discountType === "percentage" ? "e.g. 1000 for 10%" : "e.g. 50000 for NPR 500"}
+              label={store.discountType === "percentage" ? "Default Discount (basis points)" : "Default Discount (minor units)"} 
+              hint={store.discountType === "percentage" ? "e.g. 1000 for 10%" : "e.g. 50000 for NPR 500"}
             >
-              <Input type="number" defaultValue={discountType === "percentage" ? "1000" : "50000"} />
+              <Input 
+                type="number" 
+                value={store.discountType === "percentage" ? store.discountBps : store.discountMinor} 
+                onChange={(e) => store.updateSetting(store.discountType === "percentage" ? "discountBps" : "discountMinor", Number(e.target.value))} 
+              />
             </Field>
           )}
         </div>
       </Section>
 
       <Section title="Staff & Checkout Flow" description="Control what happens during the checkout process.">
-        <ToggleRow 
-          title="Require Staff Selection" 
-          description="Force the cashier to select which staff member performed the service before collecting payment." 
-          defaultChecked 
-        />
+        <div className="flex items-start justify-between gap-4 py-3 border-b border-border last:border-0">
+          <div className="min-w-0">
+            <div className="text-sm font-medium">Require Staff Selection</div>
+            <div className="text-xs text-muted-foreground mt-0.5">Force the cashier to select which staff member performed the service before collecting payment.</div>
+          </div>
+          <Switch checked={store.requireStaff} onCheckedChange={(v) => store.updateSetting("requireStaff", v)} />
+        </div>
       </Section>
 
       <Section title="Tipping & Gratuity" description="Allow customers to add tips when paying by card or digital wallet.">
-        <ToggleRow 
-          title="Enable Tipping" 
-          description="Prompt customers for a tip on the checkout screen." 
-          defaultChecked 
-        />
-        <div className="grid md:grid-cols-3 gap-4 mt-2">
-          <Field label="Tip Option 1 (%)"><Input type="number" defaultValue="5" /></Field>
-          <Field label="Tip Option 2 (%)"><Input type="number" defaultValue="10" /></Field>
-          <Field label="Tip Option 3 (%)"><Input type="number" defaultValue="15" /></Field>
+        <div className="flex items-start justify-between gap-4 py-3 border-b border-border last:border-0">
+          <div className="min-w-0">
+            <div className="text-sm font-medium">Enable Tipping</div>
+            <div className="text-xs text-muted-foreground mt-0.5">Prompt customers for a tip on the checkout screen.</div>
+          </div>
+          <Switch checked={store.enableTipping} onCheckedChange={(v) => store.updateSetting("enableTipping", v)} />
         </div>
+        {store.enableTipping && (
+          <div className="grid md:grid-cols-3 gap-4 mt-4">
+            <Field label="Tip Option 1 (%)">
+              <Input type="number" value={store.tipOptions[0]} onChange={(e) => store.updateSetting("tipOptions", [Number(e.target.value), store.tipOptions[1], store.tipOptions[2]])} />
+            </Field>
+            <Field label="Tip Option 2 (%)">
+              <Input type="number" value={store.tipOptions[1]} onChange={(e) => store.updateSetting("tipOptions", [store.tipOptions[0], Number(e.target.value), store.tipOptions[2]])} />
+            </Field>
+            <Field label="Tip Option 3 (%)">
+              <Input type="number" value={store.tipOptions[2]} onChange={(e) => store.updateSetting("tipOptions", [store.tipOptions[0], store.tipOptions[1], Number(e.target.value)])} />
+            </Field>
+          </div>
+        )}
       </Section>
 
       <Section title="Receipt Preferences" description="Choose how receipts are handled after a successful sale.">
         <Field label="Auto-receipt behavior">
-          <Select defaultValue="ask">
+          <Select value={store.receiptBehavior} onValueChange={(v: any) => store.updateSetting("receiptBehavior", v)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="print">Always print automatically</SelectItem>

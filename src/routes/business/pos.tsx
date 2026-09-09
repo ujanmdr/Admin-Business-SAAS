@@ -15,6 +15,7 @@ import {
 import { cn } from "@/lib/utils";
 import { BillReceipt, type BillData } from "@/components/BillReceipt";
 import { attemptRedeem, LOYALTY_SALON_ID, type LoyaltyRedemption, incrementCustomerStamps, cancelRedeem, lookUpCodesByPhone, useLoyaltyRedemptions } from "@/lib/loyalty-program-data";
+import { usePosStore } from "@/lib/pos-store";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/business/pos")({
@@ -50,6 +51,7 @@ const METHODS = [
 ];
 
 function POSPage() {
+  const store = usePosStore();
   const [bookingQ, setBookingQ] = useState("");
   const [tab, setTab] = useState("service");
   const [q, setQ] = useState("");
@@ -57,7 +59,14 @@ function POSPage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customer, setCustomer] = useState("Walk-in");
   const [method, setMethod] = useState("eSewa");
-  const [discount, setDiscount] = useState(10);
+  
+  // Use store for default discount, but allow overriding in this transaction
+  const [discountVal, setDiscountVal] = useState(store.discountType === "percentage" ? store.discountBps / 100 : (store.discountType === "fixed" ? store.discountMinor / 100 : 0));
+  const [isDiscountPercent, setIsDiscountPercent] = useState(store.discountType === "percentage");
+  
+  // Tipping
+  const [tipAmt, setTipAmt] = useState(0);
+
   const [bill, setBill] = useState<BillData | null>(null);
   
   // Loyalty redemption states
@@ -148,6 +157,16 @@ function POSPage() {
 
   function handleCharge() {
     if (cart.length === 0) return;
+    
+    // Check "Require Staff Selection" rule from Settings
+    if (store.requireStaff) {
+      const missingStaff = cart.some(c => c.type === "Service" && !c.staff);
+      if (missingStaff) {
+        toast.error("POS Settings Requirement: Please select a staff member for all services.");
+        return;
+      }
+    }
+
     const now = new Date();
     const pad = (n: number) => String(n).padStart(2, "0");
     const invoiceNo = `INV-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
@@ -162,7 +181,7 @@ function POSPage() {
         price: c.loyaltyFree ? 0 : c.price,
         qty: c.qty,
       })),
-      subtotal, discountPct: discount, discountAmt, loyaltyAmt: 0, vat, total,
+      subtotal, discountPct: isDiscountPercent ? discountVal : 0, discountAmt, loyaltyAmt: 0, vat, total,
       business: "Aura Beauty Lounge",
       branch: "Jhamsikhel",
       staff: cart.find(c => c.staff)?.staff || "Anisha",
@@ -179,6 +198,9 @@ function POSPage() {
     setCart([]);
     setCustomer("Walk-in");
     setAppliedRedemption(null);
+    setTipAmt(0);
+    setDiscountVal(store.discountType === "percentage" ? store.discountBps / 100 : (store.discountType === "fixed" ? store.discountMinor / 100 : 0));
+    setIsDiscountPercent(store.discountType === "percentage");
   }
 
   const items = useMemo(() => {
@@ -219,11 +241,30 @@ function POSPage() {
   }
 
   const subtotal = cart.reduce((s, x) => s + (x.loyaltyFree ? 0 : x.price * x.qty), 0);
-  const discountAmt = Math.round(subtotal * (discount / 100));
+  
+  // Calculate discount based on type (percentage or fixed)
+  const discountAmt = isDiscountPercent ? Math.round(subtotal * (discountVal / 100)) : discountVal;
+  
   const prePayment = 0; // Mock prepayment
-  const taxable = subtotal - discountAmt - prePayment;
-  const vat = Math.round(taxable * 0.13);
-  const total = taxable + vat;
+  const taxable = Math.max(0, subtotal - discountAmt - prePayment);
+  
+  // Calculate VAT based on settings
+  const vatRate = store.taxRateBps / 10000; // 1300 -> 0.13
+  let vat = 0;
+  let finalSubtotal = subtotal;
+  
+  if (store.includeTax) {
+    // If tax is included, the price already contains tax. We extract it.
+    // Price = Base + (Base * vatRate)  => Base = Price / (1 + vatRate)
+    const base = taxable / (1 + vatRate);
+    vat = taxable - base;
+  } else {
+    // Standard: Tax is added on top
+    vat = taxable * vatRate;
+  }
+  
+  // Final total includes tip
+  const total = (store.includeTax ? taxable : taxable + vat) + tipAmt;
 
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] max-h-screen overflow-hidden bg-[#FAFAF9]">
@@ -449,18 +490,56 @@ function POSPage() {
             ) : null}
 
             {/* Discount */}
-            <div>
-              <label className="text-[11px] font-medium text-muted-foreground mb-1.5 block">Discount %</label>
-              <Input type="number" value={discount} onChange={(e) => setDiscount(Number(e.target.value))} className="h-9 w-full bg-sand-soft/30 border-border/60 font-medium" />
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <label className="text-[11px] font-medium text-muted-foreground mb-1.5 block">Discount</label>
+                <Input type="number" value={discountVal} onChange={(e) => setDiscountVal(Number(e.target.value))} className="h-9 w-full bg-sand-soft/30 border-border/60 font-medium" />
+              </div>
+              <div className="w-[100px]">
+                <label className="text-[11px] font-medium text-muted-foreground mb-1.5 block">Type</label>
+                <select 
+                  value={isDiscountPercent ? "percent" : "fixed"} 
+                  onChange={(e) => setIsDiscountPercent(e.target.value === "percent")}
+                  className="h-9 w-full rounded-md border border-border/60 bg-sand-soft/30 text-xs font-medium px-2 outline-none"
+                >
+                  <option value="percent">%</option>
+                  <option value="fixed">Fixed</option>
+                </select>
+              </div>
             </div>
 
             {/* Totals */}
-            <div className="space-y-2 text-xs font-medium">
-              <div className="flex justify-between text-muted-foreground"><span>Pre Payment</span><span>{fmt(prePayment)}</span></div>
+            <div className="space-y-2 text-xs font-medium pt-2">
               <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span>{fmt(subtotal)}</span></div>
-              <div className="flex justify-between text-muted-foreground"><span>Discount ({discount}%)</span><span>−{fmt(discountAmt)}</span></div>
-              <div className="flex justify-between text-muted-foreground"><span>VAT (13%)</span><span>{fmt(vat)}</span></div>
+              {discountAmt > 0 && <div className="flex justify-between text-muted-foreground"><span>Discount {isDiscountPercent ? `(${discountVal}%)` : ""}</span><span>−{fmt(discountAmt)}</span></div>}
+              {store.includeTax ? (
+                <div className="flex justify-between text-muted-foreground"><span>Includes {store.taxType.toUpperCase()} ({(store.taxRateBps/100)}%)</span><span>{fmt(vat)}</span></div>
+              ) : (
+                <div className="flex justify-between text-muted-foreground"><span>{store.taxType.toUpperCase()} ({(store.taxRateBps/100)}%)</span><span>{fmt(vat)}</span></div>
+              )}
             </div>
+            
+            {/* Tipping UI */}
+            {store.enableTipping && (
+              <div className="pt-2 border-t border-border/60">
+                <label className="text-[11px] font-medium text-muted-foreground mb-2 block">Add Gratuity</label>
+                <div className="grid grid-cols-4 gap-2">
+                  <button onClick={() => setTipAmt(0)} className={cn("h-8 rounded-md text-xs font-medium border", tipAmt === 0 ? "bg-foreground text-background" : "bg-white border-border text-foreground hover:bg-sand-soft")}>None</button>
+                  {store.tipOptions.map(pct => {
+                    const amt = Math.round((store.includeTax ? taxable : taxable + vat) * (pct / 100));
+                    return (
+                      <button 
+                        key={pct} 
+                        onClick={() => setTipAmt(amt)} 
+                        className={cn("h-8 rounded-md text-xs font-medium border", tipAmt === amt && amt > 0 ? "bg-foreground text-background" : "bg-white border-border text-foreground hover:bg-sand-soft")}
+                      >
+                        {pct}%
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <div className="flex justify-between items-center pt-3 border-t border-border/60">
               <span className="text-sm font-semibold">Total Amount</span>
