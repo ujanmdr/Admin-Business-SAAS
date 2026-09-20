@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useFinanceStore } from "@/lib/finance-store";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -20,11 +20,16 @@ import {
 import {
   Calendar as CalendarIcon, Download, FileSpreadsheet, Printer, TrendingUp,
   Users, Repeat, XCircle, UserMinus, Activity, Package, Gift, ShoppingBag,
-  Wallet, Star, Sparkles, Clock, Award, Lightbulb,
+  Wallet, Star, Sparkles, Clock, Award, Lightbulb, Percent, Receipt
 } from "lucide-react";
 import { fmt } from "@/lib/finance-data";
+import { DailySalesReportView } from "@/components/reports/DailySalesReportView";
+import { DailyVatReportView } from "@/components/reports/DailyVatReportView";
 
 export const Route = createFileRoute("/business/reports")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    tab: (search.tab as string) || "daily-sales",
+  }),
   head: () => ({ meta: [{ title: "Reports · BRG Suite" }] }),
   component: ReportsPage,
 });
@@ -201,51 +206,91 @@ function SmartExportDialog() {
 
 // ── Page ────────────────────────────────────────────────
 function ReportsPage() {
+  const search = Route.useSearch();
+  const [activeMainTab, setActiveMainTab] = useState(search?.tab || "daily-sales");
+
+  useEffect(() => {
+    if (search?.tab) {
+      setActiveMainTab(search.tab);
+    }
+  }, [search?.tab]);
+
   return (
-    <div className="px-6 md:px-10 py-8 max-w-[1500px] mx-auto">
+    <div className="px-4 sm:px-6 md:px-10 py-8 max-w-[1500px] mx-auto space-y-6">
       <PageHeader
-        eyebrow="System"
+        eyebrow="Financial Governance"
         title="Reports & Analytics"
-        description="Investor-grade insights across revenue, customers, staff and operations."
+        description="Daily sales statements, official VAT registers, and multi-period financial insights."
         actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" className="gap-1.5"><FileSpreadsheet className="size-4" /> CSV</Button>
-            <Button variant="outline" size="sm" className="gap-1.5"><Printer className="size-4" /> Print</Button>
+          <div className="flex flex-wrap items-center gap-2 print:hidden">
             <SmartExportDialog />
           </div>
         }
       />
 
-      <FilterBar />
-      <ExecutiveSummary />
-
-      <Tabs defaultValue="finance" className="mt-2">
-        <TabsList className="bg-card border border-border mb-6 flex-wrap h-auto">
-          <TabsTrigger value="finance">Finance</TabsTrigger>
-          <TabsTrigger value="revenue">Revenue</TabsTrigger>
-          <TabsTrigger value="bookings">Bookings</TabsTrigger>
-          <TabsTrigger value="customers">Customers</TabsTrigger>
-          <TabsTrigger value="staff">Staff</TabsTrigger>
-          <TabsTrigger value="services">Services</TabsTrigger>
-          <TabsTrigger value="programs">Packages & Memberships</TabsTrigger>
-          <TabsTrigger value="giftcards">Gift Cards</TabsTrigger>
-          <TabsTrigger value="loyalty">Loyalty</TabsTrigger>
-          <TabsTrigger value="inventory">Inventory</TabsTrigger>
+      <Tabs value={activeMainTab} onValueChange={setActiveMainTab} className="w-full">
+        <TabsList className="bg-sand-soft/60 p-1.5 mb-6 flex-wrap h-auto gap-1.5 border border-border print:hidden">
+          <TabsTrigger
+            value="daily-sales"
+            className="gap-2 data-[state=active]:bg-card data-[state=active]:shadow-sm rounded-xl font-medium"
+          >
+            <TrendingUp className="h-4 w-4 text-emerald-600" /> Daily Sales Report
+          </TabsTrigger>
+          <TabsTrigger
+            value="daily-vat"
+            className="gap-2 data-[state=active]:bg-card data-[state=active]:shadow-sm rounded-xl font-medium"
+          >
+            <Percent className="h-4 w-4 text-primary" /> Daily VAT Report
+          </TabsTrigger>
+          <TabsTrigger
+            value="overview"
+            className="gap-2 data-[state=active]:bg-card data-[state=active]:shadow-sm rounded-xl font-medium"
+          >
+            <Activity className="h-4 w-4 text-muted-foreground" /> Periodic Analytics
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="finance"><FinanceTab /></TabsContent>
-        <TabsContent value="revenue"><RevenueTab /></TabsContent>
-        <TabsContent value="bookings"><BookingsTab /></TabsContent>
-        <TabsContent value="customers"><CustomersTab /></TabsContent>
-        <TabsContent value="staff"><StaffTab /></TabsContent>
-        <TabsContent value="services"><ServicesTab /></TabsContent>
-        <TabsContent value="programs"><ProgramsTab /></TabsContent>
-        <TabsContent value="giftcards"><GiftCardsTab /></TabsContent>
-        <TabsContent value="loyalty"><LoyaltyTab /></TabsContent>
-        <TabsContent value="inventory"><InventoryTab /></TabsContent>
-      </Tabs>
+        <TabsContent value="daily-sales" className="mt-0">
+          <DailySalesReportView />
+        </TabsContent>
 
-      <SmartInsights />
+        <TabsContent value="daily-vat" className="mt-0">
+          <DailyVatReportView />
+        </TabsContent>
+
+        <TabsContent value="overview" className="mt-0 space-y-6">
+          <FilterBar />
+          <ExecutiveSummary />
+
+          <Tabs defaultValue="finance" className="mt-2">
+            <TabsList className="bg-card border border-border mb-6 flex-wrap h-auto">
+              <TabsTrigger value="finance">Finance</TabsTrigger>
+              <TabsTrigger value="revenue">Revenue</TabsTrigger>
+              <TabsTrigger value="bookings">Bookings</TabsTrigger>
+              <TabsTrigger value="customers">Customers</TabsTrigger>
+              <TabsTrigger value="staff">Staff</TabsTrigger>
+              <TabsTrigger value="services">Services</TabsTrigger>
+              <TabsTrigger value="programs">Packages & Memberships</TabsTrigger>
+              <TabsTrigger value="giftcards">Gift Cards</TabsTrigger>
+              <TabsTrigger value="loyalty">Loyalty</TabsTrigger>
+              <TabsTrigger value="inventory">Inventory</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="finance"><FinanceTab /></TabsContent>
+            <TabsContent value="revenue"><RevenueTab /></TabsContent>
+            <TabsContent value="bookings"><BookingsTab /></TabsContent>
+            <TabsContent value="customers"><CustomersTab /></TabsContent>
+            <TabsContent value="staff"><StaffTab /></TabsContent>
+            <TabsContent value="services"><ServicesTab /></TabsContent>
+            <TabsContent value="programs"><ProgramsTab /></TabsContent>
+            <TabsContent value="giftcards"><GiftCardsTab /></TabsContent>
+            <TabsContent value="loyalty"><LoyaltyTab /></TabsContent>
+            <TabsContent value="inventory"><InventoryTab /></TabsContent>
+          </Tabs>
+
+          <SmartInsights />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

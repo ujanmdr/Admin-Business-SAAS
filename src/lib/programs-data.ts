@@ -120,6 +120,14 @@ export const MEMBERSHIPS: Membership[] = [
   },
 ];
 
+export const GIFT_CARD_DESIGNS = [
+  { id: "gold", name: "Classic Gold", gradient: "from-[#d4af37] via-[#f3e5ab] to-[#aa7c11]", text: "text-amber-950", dot: "bg-[#d4af37]" },
+  { id: "floral", name: "Floral Blush", gradient: "from-[#fbc2eb] to-[#a6c1ee]", text: "text-indigo-950", dot: "bg-[#fbc2eb]" },
+  { id: "teal", name: "Festive Teal", gradient: "from-[#4facfe] to-[#00f2fe]", text: "text-blue-950", dot: "bg-[#4facfe]" },
+  { id: "sage", name: "Minimal Sage", gradient: "from-[#e2d9c2] to-[#b0be99]", text: "text-emerald-950", dot: "bg-[#b0be99]" },
+  { id: "luxe", name: "Midnight Luxe", gradient: "from-[#0f2027] via-[#203a43] to-[#2c5364]", text: "text-slate-100", dot: "bg-[#0f2027]" },
+] as const;
+
 export type GiftCard = {
   id: string;
   code: string;
@@ -132,15 +140,16 @@ export type GiftCard = {
   deliveryDate: string;
   expiryDate: string;
   status: "Delivered" | "Scheduled" | "Redeemed" | "Expired";
+  designId: string;
 };
 
 export const GIFT_CARDS: GiftCard[] = [
-  { id: "g1", code: "AURA-7842-XK", amount: 10000, remaining: 6500, sender: "Pratima Joshi", recipient: "Sneha Karki", recipientPhone: "+977 98 4423 5612", message: "Happy birthday darling — go pamper yourself ✨", deliveryDate: "2026-04-22", expiryDate: "2027-04-22", status: "Redeemed" },
-  { id: "g2", code: "AURA-9221-AB", amount: 5000, remaining: 5000, sender: "Rojan Basnet", recipient: "Manisha Lama", recipientPhone: "+977 98 1100 4421", message: "For my favourite mom 💐", deliveryDate: "2026-05-08", expiryDate: "2027-05-08", status: "Scheduled" },
-  { id: "g3", code: "AURA-6610-PL", amount: 15000, remaining: 11200, sender: "Anuj Shrestha", recipient: "Reema Shrestha", recipientPhone: "+977 98 2244 5530", message: "Happy anniversary ❤️", deliveryDate: "2026-04-28", expiryDate: "2027-04-28", status: "Delivered" },
-  { id: "g4", code: "AURA-5523-MN", amount: 8000, remaining: 0, sender: "Karuna K.C.", recipient: "Pooja Maharjan", recipientPhone: "+977 98 0123 9921", message: "Thanks for the bridal magic!", deliveryDate: "2026-03-12", expiryDate: "2027-03-12", status: "Redeemed" },
-  { id: "g5", code: "AURA-1188-QQ", amount: 3000, remaining: 3000, sender: "Sushma Rai", recipient: "Bishal Lama", recipientPhone: "+977 98 7733 1102", message: "Take a break, you earned it.", deliveryDate: "2026-05-01", expiryDate: "2027-05-01", status: "Delivered" },
-  { id: "g6", code: "AURA-3399-WX", amount: 20000, remaining: 0, sender: "Aura HQ", recipient: "Ankita Rai", recipientPhone: "+977 98 5566 1133", message: "Customer of the year reward 🌟", deliveryDate: "2026-01-15", expiryDate: "2026-04-15", status: "Expired" },
+  { id: "g1", code: "AURA-7842-XK", amount: 10000, remaining: 6500, sender: "Pratima Joshi", recipient: "Sneha Karki", recipientPhone: "+977 98 4423 5612", message: "Happy birthday darling — go pamper yourself ✨", deliveryDate: "2026-04-22", expiryDate: "2027-04-22", status: "Redeemed", designId: "gold" },
+  { id: "g2", code: "AURA-9221-AB", amount: 5000, remaining: 5000, sender: "Rojan Basnet", recipient: "Manisha Lama", recipientPhone: "+977 98 1100 4421", message: "For my favourite mom 💐", deliveryDate: "2026-05-08", expiryDate: "2027-05-08", status: "Scheduled", designId: "floral" },
+  { id: "g3", code: "AURA-6610-PL", amount: 15000, remaining: 11200, sender: "Anuj Shrestha", recipient: "Reema Shrestha", recipientPhone: "+977 98 2244 5530", message: "Happy anniversary ❤️", deliveryDate: "2026-04-28", expiryDate: "2027-04-28", status: "Delivered", designId: "luxe" },
+  { id: "g4", code: "AURA-5523-MN", amount: 8000, remaining: 0, sender: "Karuna K.C.", recipient: "Pooja Maharjan", recipientPhone: "+977 98 0123 9921", message: "Thanks for the bridal magic!", deliveryDate: "2026-03-12", expiryDate: "2027-03-12", status: "Redeemed", designId: "teal" },
+  { id: "g5", code: "AURA-1188-QQ", amount: 3000, remaining: 3000, sender: "Sushma Rai", recipient: "Bishal Lama", recipientPhone: "+977 98 7733 1102", message: "Take a break, you earned it.", deliveryDate: "2026-05-01", expiryDate: "2027-05-01", status: "Delivered", designId: "sage" },
+  { id: "g6", code: "AURA-3399-WX", amount: 20000, remaining: 0, sender: "Aura HQ", recipient: "Ankita Rai", recipientPhone: "+977 98 5566 1133", message: "Customer of the year reward 🌟", deliveryDate: "2026-01-15", expiryDate: "2026-04-15", status: "Expired", designId: "luxe" },
 ];
 
 export type LoyaltyCustomer = {

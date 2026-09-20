@@ -1,4 +1,4 @@
-﻿import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import {
@@ -7,6 +7,8 @@ import {
 } from "@/lib/booking-data";
 import { BookingDrawer } from "@/components/BookingDrawer";
 import { NewBookingModal } from "@/components/NewBookingModal";
+import { InvoiceModal } from "@/components/invoice/InvoiceModal";
+import type { InvoiceData } from "@/components/invoice/InvoiceDocument";
 import {
   Plus, Search, Filter, Eye, CheckCircle2, RotateCcw, XCircle, Bell, CreditCard, Receipt, MoreHorizontal,
   Download, ArrowUpDown,
@@ -16,13 +18,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export const Route = createFileRoute("/business/bookings")({
-  head: () => ({ meta: [{ title: "Bookings Â· BRG Suite" }] }),
+  head: () => ({ meta: [{ title: "Bookings · BRG Suite" }] }),
   component: BookingsPage,
 });
 
 export function BookingsPage() {
   const [open, setOpen] = useState<Booking | null>(null);
   const [modal, setModal] = useState(false);
+  const [invoiceModalData, setInvoiceModalData] = useState<InvoiceData | null>(null);
   const [q, setQ] = useState("");
   const [branch, setBranch] = useState("All");
   const [staff, setStaff] = useState("All");
@@ -31,6 +34,46 @@ export function BookingsPage() {
   const [pay, setPay] = useState("All");
   const [source, setSource] = useState("All");
   const [range, setRange] = useState("Last 30 days");
+
+  function handleGenerateInvoice(b: Booking) {
+    const serviceAmount = b.amount || 1500;
+    const subtotal = Math.round(serviceAmount / 1.13);
+    const tax = serviceAmount - subtotal;
+
+    setInvoiceModalData({
+      invoiceNo: `BK-${b.id}`,
+      orderNo: b.id.replace(/\D/g, "") || "101",
+      date: b.date,
+      time: b.start,
+      orderType: "Appointment",
+      deliveryStaff: b.staff,
+      customer: {
+        name: b.customer,
+        phone: b.phone,
+        pan: "60" + (b.phone?.replace(/\D/g, "").slice(-7) || "1234567"),
+        address: `${b.branch}, Nepal`,
+      },
+      items: [
+        {
+          sn: 1,
+          hsCode: "96.02",
+          particular: `${b.service} (${b.category})`,
+          rate: subtotal,
+          qty: 1,
+          amount: subtotal,
+        },
+      ],
+      itemTotal: subtotal,
+      loyaltyDiscount: b.loyalty ? 200 : 0,
+      offerDiscount: 0,
+      subtotal: Math.max(0, subtotal - (b.loyalty ? 200 : 0)),
+      tax: tax,
+      total: b.amount,
+      paymentMethod: b.payment.method,
+      status: b.payment.status === "Paid" ? "Paid" : "Estimate",
+      notes: b.notes || `Appointment reference #${b.id} at ${b.branch} branch.`,
+    });
+  }
 
   const rows = useMemo(() => BOOKINGS.filter((b) =>
     (q === "" || b.customer.toLowerCase().includes(q.toLowerCase()) || b.id.toLowerCase().includes(q.toLowerCase()) || b.service.toLowerCase().includes(q.toLowerCase())) &&
@@ -80,7 +123,7 @@ export function BookingsPage() {
       <div className="rounded-2xl bg-card border border-border p-4 mb-4 flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[220px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by booking ID, customer, serviceâ€¦"
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by booking ID, customer, service…"
             className="w-full rounded-xl border border-border bg-background pl-9 pr-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring/40" />
         </div>
         <FilterSelect label="Range" value={range} onChange={setRange} options={["Today","Last 7 days","Last 30 days","This month","All time"]} />
@@ -143,7 +186,7 @@ export function BookingsPage() {
                   <td className="px-4 py-3 text-right font-medium">NPR {b.amount.toLocaleString()}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center gap-1 text-[11px] rounded-full border px-2.5 py-1 ${payTone(b.payment.status)}`}>
-                      {b.payment.method} Â· {b.payment.status}
+                      {b.payment.method} · {b.payment.status}
                     </span>
                   </td>
                   <td className="px-4 py-3">
@@ -164,7 +207,7 @@ export function BookingsPage() {
                         <DropdownMenuSeparator />
                         <DropdownMenuItem><Bell className="h-4 w-4 mr-2" />Send Reminder</DropdownMenuItem>
                         <DropdownMenuItem><CreditCard className="h-4 w-4 mr-2" />Collect Payment</DropdownMenuItem>
-                        <DropdownMenuItem><Receipt className="h-4 w-4 mr-2" />Print Receipt</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleGenerateInvoice(b)}><Receipt className="h-4 w-4 mr-2" />Print Receipt</DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem className="text-destructive"><XCircle className="h-4 w-4 mr-2" />Cancel</DropdownMenuItem>
                       </DropdownMenuContent>
@@ -181,13 +224,23 @@ export function BookingsPage() {
         <div className="flex items-center justify-between px-4 py-3 border-t border-border text-xs text-muted-foreground">
           <span>Showing {rows.length} of {BOOKINGS.length}</span>
           <div className="inline-flex items-center gap-1">
-            <Filter className="h-3 w-3" />Filtered total Â· NPR {total.toLocaleString()}
+            <Filter className="h-3 w-3" />Filtered total · NPR {total.toLocaleString()}
           </div>
         </div>
       </div>
 
-      <BookingDrawer booking={open} onClose={() => setOpen(null)} />
+      <BookingDrawer
+        booking={open}
+        onClose={() => setOpen(null)}
+        onPrintReceipt={handleGenerateInvoice}
+      />
       <NewBookingModal open={modal} onOpenChange={setModal} />
+
+      <InvoiceModal
+        isOpen={Boolean(invoiceModalData)}
+        bill={invoiceModalData}
+        onClose={() => setInvoiceModalData(null)}
+      />
     </div>
   );
 }
@@ -217,4 +270,3 @@ function FilterSelect({ label, value, onChange, options }: { label: string; valu
     </label>
   );
 }
-

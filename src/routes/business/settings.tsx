@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { branches } from "@/lib/nav";
 import {
   Building2, Clock, CalendarCheck, CreditCard, Bell, Shield, Globe2, Palette,
-  Upload, MapPin, Plus, Star, Trophy, Sparkles, Image as ImageIcon, Save, Check, Heart, ShoppingBag
+  Upload, MapPin, Plus, Star, Trophy, Sparkles, Image as ImageIcon, Save, Check, Heart, Receipt, ShoppingBag,
 } from "lucide-react";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -17,6 +17,7 @@ import {
 import { cn } from "@/lib/utils";
 import { LoyaltyProgramSettings } from "@/components/LoyaltyProgramSettings";
 import { SubscriptionSettings } from "@/components/SubscriptionSettings";
+import { InvoiceSettingsView } from "@/components/invoice/InvoiceSettingsView";
 import { useTheme } from "@/components/ThemeProvider";
 import { useTenantStore } from "@/store/tenant-store";
 import { mockBusinesses } from "@/lib/tenant-data";
@@ -29,6 +30,7 @@ export const Route = createFileRoute("/business/settings")({
 
 const TABS = [
   { v: "business", label: "Business", icon: Building2 },
+  { v: "invoice", label: "Invoice Settings", icon: Receipt },
   { v: "hours", label: "Hours", icon: Clock },
   { v: "booking", label: "Booking", icon: CalendarCheck },
   { v: "payment", label: "Payments", icon: CreditCard },
@@ -102,6 +104,13 @@ const COLORS = ["#8A9478", "#D8B0A8", "#B07D2C", "#5F6B57", "#7A846A", "#D9E4EA"
 function SettingsPage() {
   const [color, setColor] = useState(COLORS[0]);
   const [roleMatrix, setRoleMatrix] = useState<Record<string, string[]>>(INITIAL_ROLE_MATRIX);
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("tab") || "business";
+    }
+    return "business";
+  });
 
   const togglePermission = (role: string, perm: string) => {
     setRoleMatrix((prev) => {
@@ -127,7 +136,7 @@ function SettingsPage() {
         }
       />
 
-      <Tabs defaultValue="business" className="w-full">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="bg-sand-soft h-auto flex-wrap gap-1 p-1.5 mb-6">
           {TABS.map((t) => {
             const Icon = t.icon;
@@ -138,6 +147,11 @@ function SettingsPage() {
             );
           })}
         </TabsList>
+
+        {/* INVOICE */}
+        <TabsContent value="invoice" className="space-y-6">
+          <InvoiceSettingsView />
+        </TabsContent>
 
         {/* BUSINESS */}
         <TabsContent value="business" className="space-y-6">
@@ -300,6 +314,7 @@ function SettingsPage() {
           <Section title="Tax & invoicing">
             <div className="grid md:grid-cols-3 gap-4">
               <Field label="Deposit percentage"><Input defaultValue="20%" /></Field>
+              <Field label="VAT (%)"><Input defaultValue="13" /></Field>
               <Field label="Invoice prefix"><Input defaultValue="AURA-" /></Field>
             </div>
             <Field label="Refund rules">

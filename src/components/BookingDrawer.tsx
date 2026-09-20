@@ -5,18 +5,26 @@ import {
   Calendar, CheckCircle2, XCircle, RotateCcw, CreditCard, Receipt, FileText,
 } from "lucide-react";
 
-export function BookingDrawer({ booking, onClose }: { booking: Booking | null; onClose: () => void }) {
+export function BookingDrawer({
+  booking,
+  onClose,
+  onPrintReceipt,
+}: {
+  booking: Booking | null;
+  onClose: () => void;
+  onPrintReceipt?: (b: Booking) => void;
+}) {
   return (
     <Sheet open={!!booking} onOpenChange={(o) => !o && onClose()}>
       <SheetContent side="right" className="w-full sm:max-w-lg p-0 bg-background overflow-y-auto">
         <SheetTitle className="sr-only">Booking details</SheetTitle>
-        {booking && <DrawerBody b={booking} />}
+        {booking && <DrawerBody b={booking} onPrintReceipt={onPrintReceipt} />}
       </SheetContent>
     </Sheet>
   );
 }
 
-function DrawerBody({ b }: { b: Booking }) {
+function DrawerBody({ b, onPrintReceipt }: { b: Booking; onPrintReceipt?: (b: Booking) => void }) {
   return (
     <div className="flex flex-col">
       {/* Hero */}
@@ -91,7 +99,7 @@ function DrawerBody({ b }: { b: Booking }) {
           <Action icon={CheckCircle2} label="Mark Completed" tone="primary" />
           <Action icon={CreditCard} label="Collect Payment" />
           <Action icon={RotateCcw} label="Reschedule" />
-          <Action icon={Receipt} label="Print Receipt" />
+          <Action icon={Receipt} label="Print Receipt" onClick={() => onPrintReceipt?.(b)} />
           <Action icon={FileText} label="Add Note" />
           <Action icon={XCircle} label="Cancel" tone="rose" />
         </div>
@@ -131,14 +139,14 @@ function IconBtn({ icon: Icon, label }: { icon: any; label: string }) {
   );
 }
 
-function Action({ icon: Icon, label, tone }: { icon: any; label: string; tone?: "primary" | "rose" }) {
+function Action({ icon: Icon, label, tone, onClick }: { icon: any; label: string; tone?: "primary" | "rose"; onClick?: () => void }) {
   const cls = tone === "primary"
     ? "bg-primary text-primary-foreground hover:opacity-95"
     : tone === "rose"
       ? "bg-rose-soft text-deep-olive border border-border hover:opacity-90"
       : "bg-card border border-border text-foreground hover:bg-muted";
   return (
-    <button className={`rounded-xl ${cls} py-2.5 text-sm font-medium transition flex items-center justify-center gap-2`}>
+    <button onClick={onClick} className={`rounded-xl ${cls} py-2.5 text-sm font-medium transition flex items-center justify-center gap-2`}>
       <Icon className="h-4 w-4" />{label}
     </button>
   );

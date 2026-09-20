@@ -10,12 +10,13 @@ import {
 } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  ShoppingCart, Plus, Search, Filter, Truck, ArrowUpDown, Calendar,
-  CreditCard, CheckCircle2, Clock, AlertCircle, FileText, Trash2, Eye, ChevronRight
+  ShoppingCart, Plus, Search, Filter, Truck, Calendar,
+  CreditCard, CheckCircle2, Clock, AlertCircle, FileText, Trash2, Eye, RotateCcw, Building2
 } from "lucide-react";
 import {
-  getPurchases, addPurchase, markPurchasePaid, Purchase, PurchaseItem,
-  PurchaseType, PurchasePaymentStatus, UnitType
+  getPurchases, addPurchase, updatePurchaseStatus, recordPurchasePayment, recordPurchaseReturn,
+  getPurchasePayments, getPurchaseReturns, getPurchaseCategories,
+  Purchase, PurchaseCategory, PurchaseStatus, PurchaseLineItem, PurchasePayment, PurchaseReturn
 } from "@/lib/purchase-state";
 import { getSuppliers, Supplier } from "@/lib/supplier-state";
 import { getInventoryProducts } from "@/lib/inventory-state";
@@ -28,343 +29,360 @@ export const Route = createFileRoute("/business/purchases")({
   component: PurchasesPage,
 });
 
-const PURCHASE_TYPES: PurchaseType[] = [
-  "Regular Restock",
-  "Emergency Buy",
-  "New Product Trial",
-  "Bulk Order",
-];
-
-const UNIT_TYPES: UnitType[] = [
-  "Bottle",
-  "Box",
-  "Carton",
-  "Piece",
-  "Tube",
-  "Can",
-  "Packet",
-  "Pack",
-];
-
-function PurchasesPage() {
+export function PurchasesPage() {
   const navigate = useNavigate();
   const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [categories, setCategories] = useState<PurchaseCategory[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
 
   // Search & Filter
   const [q, setQ] = useState("");
-  const [typeFilter, setTypeFilter] = useState<string>("All");
   const [statusFilter, setStatusFilter] = useState<string>("All");
-  const [supplierFilter, setSupplierFilter] = useState<string>("All");
+  const [paymentFilter, setPaymentFilter] = useState<string>("All");
+  const [categoryFilter, setCategoryFilter] = useState<string>("All");
 
   // New Purchase Dialog state
   const [openNewPurchase, setOpenNewPurchase] = useState(false);
   const [selectedSupplierId, setSelectedSupplierId] = useState("");
-  const [purchaseType, setPurchaseType] = useState<PurchaseType>("Regular Restock");
-  const [invoiceRef, setInvoiceRef] = useState("");
-  const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().split("T")[0]);
-  const [paymentMethod, setPaymentMethod] = useState<Purchase["paymentMethod"]>("Credit");
-  const [paymentStatus, setPaymentStatus] = useState<PurchasePaymentStatus>("Credit (Unpaid)");
-  const [amountPaid, setAmountPaid] = useState(0);
-  const [creditDueDate, setCreditDueDate] = useState("");
-  const [discount, setDiscount] = useState(0);
+  const [customSupplierName, setCustomSupplierName] = useState("");
+  const [selectedCategoryId, setSelectedCategoryId] = useState("");
+  const [referenceNumber, setReferenceNumber] = useState("");
+  const [purchaseStatus, setPurchaseStatus] = useState<PurchaseStatus>("draft");
+  const [discountAmount, setDiscountAmount] = useState(0);
+  const [applyVat, setApplyVat] = useState(true);
   const [notes, setNotes] = useState("");
-  const [updateStock, setUpdateStock] = useState(true);
 
-  // Line items state in modal
+  // Line items state
   const [items, setItems] = useState<
     Array<{
       productId: string;
       productName: string;
       sku: string;
-      category: string;
       qty: number;
-      unitType: string;
-      packSize: number;
       unitCost: number;
     }>
   >([
-    {
-      productId: "",
-      productName: "",
-      sku: "",
-      category: "",
-      qty: 1,
-      unitType: "Bottle",
-      packSize: 1,
-      unitCost: 0,
-    },
+    { productId: "", productName: "", sku: "", qty: 1, unitCost: 0 },
   ]);
 
-  // View Invoice Detail Modal
-  const [viewInvoice, setViewInvoice] = useState<Purchase | null>(null);
+  // Selected Purchase for detail view
+  const [viewPurchase, setViewPurchase] = useState<Purchase | null>(null);
+  const [purchasePayments, setPurchasePayments] = useState<PurchasePayment[]>([]);
+  const [purchaseReturns, setPurchaseReturns] = useState<PurchaseReturn[]>([]);
+
+  // Record Payment Dialog
+  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [payTargetPurchase, setPayTargetPurchase] = useState<Purchase | null>(null);
+  const [payAmount, setPayAmount] = useState(0);
+  const [payMethod, setPayMethod] = useState("Bank Transfer");
+  const [payNote, setPayNote] = useState("");
+
+  // Purchase Return Dialog
+  const [returnDialogOpen, setReturnDialogOpen] = useState(false);
+  const [returnTargetPurchase, setReturnTargetPurchase] = useState<Purchase | null>(null);
+  const [returnReason, setReturnReason] = useState("");
+  const [returnLines, setReturnLines] = useState<{ productId: string; productName: string; qty: number; unitCost: number }[]>([]);
 
   const refreshData = () => {
     setPurchases(getPurchases());
+    setCategories(getPurchaseCategories());
     setSuppliers(getSuppliers());
     setProducts(getInventoryProducts());
   };
 
   useEffect(() => {
     refreshData();
-
-    // Check query params for quick pre-fill from Inventory or Supplier page
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const prefillSupplier = params.get("supplierId");
-      const prefillProduct = params.get("reorderProductId");
-
-      if (prefillSupplier || prefillProduct) {
-        setOpenNewPurchase(true);
-        if (prefillSupplier) {
-          setSelectedSupplierId(prefillSupplier);
-          const sup = getSuppliers().find((s) => s.id === prefillSupplier);
-          if (sup && sup.paymentMethod === "Credit") {
-            setPaymentMethod("Credit");
-            setPaymentStatus("Credit (Unpaid)");
-            // Calculate due date
-            const due = new Date();
-            due.setDate(due.getDate() + (sup.creditDays || 30));
-            setCreditDueDate(due.toISOString().split("T")[0]);
-          }
-        }
-        if (prefillProduct) {
-          const prod = getInventoryProducts().find((p) => p.id === prefillProduct);
-          if (prod) {
-            const defSupplier = getSuppliers().find(
-              (s) => s.id === prod.supplierId || s.name.toLowerCase() === prod.supplier.toLowerCase()
-            );
-            if (defSupplier && !prefillSupplier) {
-              setSelectedSupplierId(defSupplier.id);
-            }
-            const deficit = Math.max(prod.threshold * 2 - prod.stock, 5);
-            setItems([
-              {
-                productId: prod.id,
-                productName: prod.name,
-                sku: prod.sku,
-                category: prod.category,
-                qty: deficit,
-                unitType: prod.unitType || "Bottle",
-                packSize: 1,
-                unitCost: prod.costPrice,
-              },
-            ]);
-          }
-        }
-      }
-    }
   }, []);
 
-  // Filtered Purchases list
-  const filteredPurchases = useMemo(() => {
-    return purchases.filter((p) => {
-      const matchQ =
-        q === "" ||
-        p.id.toLowerCase().includes(q.toLowerCase()) ||
-        p.invoiceRef.toLowerCase().includes(q.toLowerCase()) ||
-        p.supplierName.toLowerCase().includes(q.toLowerCase()) ||
-        p.items.some((i) => i.productName.toLowerCase().includes(q.toLowerCase()));
+  // Update payment/return logs when viewing a purchase
+  useEffect(() => {
+    if (viewPurchase) {
+      setPurchasePayments(getPurchasePayments(viewPurchase.id));
+      setPurchaseReturns(getPurchaseReturns(viewPurchase.id));
+    }
+  }, [viewPurchase]);
 
-      const matchType = typeFilter === "All" || p.purchaseType === typeFilter;
-      const matchStatus = statusFilter === "All" || p.paymentStatus === statusFilter;
-      const matchSupplier = supplierFilter === "All" || p.supplierId === supplierFilter;
+  // Handle supplier change in Add dialog
+  const handleSupplierSelect = (supId: string) => {
+    setSelectedSupplierId(supId);
+    if (supId === "custom") {
+      setCustomSupplierName("");
+    } else {
+      const sup = suppliers.find((s) => s.id === supId);
+      if (sup) setCustomSupplierName(sup.name);
+    }
+  };
 
-      return matchQ && matchType && matchStatus && matchSupplier;
-    });
-  }, [purchases, q, typeFilter, statusFilter, supplierFilter]);
-
-  // Overall KPIs
-  const totalSpend = useMemo(() => purchases.reduce((sum, p) => sum + p.totalAmount, 0), [purchases]);
-  const unpaidCredit = useMemo(
-    () =>
-      purchases
-        .filter((p) => p.paymentStatus !== "Paid")
-        .reduce((sum, p) => sum + (p.totalAmount - (p.amountPaid || 0)), 0),
-    [purchases]
-  );
-  const avgOrder = purchases.length ? Math.round(totalSpend / purchases.length) : 0;
-
-  // Calculate Modal Totals
+  // Line items calculations
   const subtotal = useMemo(() => {
     return items.reduce((acc, item) => acc + (item.qty || 0) * (item.unitCost || 0), 0);
   }, [items]);
 
-  const grandTotal = Math.max(0, subtotal - discount);
+  const taxAmount = useMemo(() => {
+    if (!applyVat) return 0;
+    const taxable = Math.max(0, subtotal - discountAmount);
+    return Math.round(taxable * 0.13);
+  }, [subtotal, discountAmount, applyVat]);
 
-  // When supplier is selected in modal, auto-set default payment terms
-  const handleSupplierChange = (supId: string) => {
-    setSelectedSupplierId(supId);
-    const sup = suppliers.find((s) => s.id === supId);
-    if (sup) {
-      if (sup.paymentMethod === "Credit") {
-        setPaymentMethod("Credit");
-        setPaymentStatus("Credit (Unpaid)");
-        const due = new Date();
-        due.setDate(due.getDate() + (sup.creditDays || 30));
-        setCreditDueDate(due.toISOString().split("T")[0]);
-      } else {
-        setPaymentMethod(sup.paymentMethod);
-        setPaymentStatus("Paid");
-        setAmountPaid(grandTotal);
-        setCreditDueDate("");
-      }
+  const grandTotal = useMemo(() => {
+    return Math.max(0, subtotal - discountAmount) + taxAmount;
+  }, [subtotal, discountAmount, taxAmount]);
+
+  // Line item helpers
+  const handleProductSelect = (index: number, prodId: string) => {
+    const found = products.find((p) => p.id === prodId);
+    if (found) {
+      const copy = [...items];
+      copy[index] = {
+        productId: found.id,
+        productName: found.name,
+        sku: found.sku || "",
+        qty: copy[index].qty || 1,
+        unitCost: found.costPrice || 0,
+      };
+      setItems(copy);
     }
   };
 
-  // Line item handlers
-  const handleItemProductSelect = (index: number, prodId: string) => {
-    const prod = products.find((p) => p.id === prodId);
-    if (!prod) return;
-    const newItems = [...items];
-    newItems[index] = {
-      ...newItems[index],
-      productId: prod.id,
-      productName: prod.name,
-      sku: prod.sku,
-      category: prod.category,
-      unitType: prod.unitType || "Bottle",
-      unitCost: prod.costPrice,
-    };
-    setItems(newItems);
+  const updateItemField = (index: number, field: string, val: any) => {
+    const copy = [...items];
+    copy[index] = { ...copy[index], [field]: val };
+    setItems(copy);
   };
 
-  const handleItemChange = (index: number, field: string, value: any) => {
-    const newItems = [...items];
-    newItems[index] = { ...newItems[index], [field]: value };
-    setItems(newItems);
+  const addItem = () => {
+    setItems([...items, { productId: "", productName: "", sku: "", qty: 1, unitCost: 0 }]);
   };
 
-  const handleAddItem = () => {
-    setItems([
-      ...items,
-      {
-        productId: "",
-        productName: "",
-        sku: "",
-        category: "",
-        qty: 1,
-        unitType: "Bottle",
-        packSize: 1,
-        unitCost: 0,
-      },
-    ]);
-  };
-
-  const handleRemoveItem = (index: number) => {
-    if (items.length <= 1) {
-      toast.error("A purchase order must contain at least one item.");
-      return;
-    }
+  const removeItem = (index: number) => {
+    if (items.length <= 1) return;
     setItems(items.filter((_, i) => i !== index));
   };
 
-  // Submit New Purchase
-  const handleSubmitPurchase = (e: React.FormEvent) => {
+  // Create Purchase
+  const handleCreatePurchase = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedSupplierId) {
-      toast.error("Please choose a supplier.");
+    const finalSupplierName = customSupplierName.trim();
+    if (!finalSupplierName) {
+      toast.error("Please select a supplier or enter a vendor name.");
       return;
     }
 
-    const sup = suppliers.find((s) => s.id === selectedSupplierId);
-    const supplierName = sup ? sup.name : "Vendor";
-
-    // Validate items
-    const validItems: PurchaseItem[] = [];
-    for (const it of items) {
-      if (!it.productId) {
-        toast.error("Please pick a product for all rows or delete empty rows.");
-        return;
-      }
-      if (it.qty <= 0) {
-        toast.error("Quantities must be at least 1.");
-        return;
-      }
-      const packSize = Number(it.packSize) || 1;
-      const totalUnits = it.qty * packSize;
-      const lineTotal = it.qty * it.unitCost;
-      validItems.push({
-        productId: it.productId,
-        productName: it.productName,
-        sku: it.sku,
-        category: it.category,
-        qty: it.qty,
-        unitType: it.unitType,
-        packSize,
-        totalUnits,
-        unitCost: it.unitCost,
-        lineTotal,
-      });
+    const validItems = items.filter((i) => i.productName.trim() && i.qty > 0);
+    if (validItems.length === 0) {
+      toast.error("Please add at least one valid line item with quantity > 0.");
+      return;
     }
 
-    const newPO = addPurchase(
-      {
-        date: purchaseDate,
-        supplierId: selectedSupplierId,
-        supplierName,
-        purchaseType,
-        items: validItems,
-        subtotal,
-        discount: Number(discount) || 0,
-        totalAmount: grandTotal,
-        paymentStatus,
-        paymentMethod,
-        amountPaid: paymentStatus === "Paid" ? grandTotal : Number(amountPaid) || 0,
-        creditDueDate: paymentStatus !== "Paid" ? creditDueDate : "",
-        invoiceRef: invoiceRef.trim(),
-        notes: notes.trim(),
-        branch: "Jhamsikhel",
-        recordedBy: "Receptionist / Store",
-      },
-      updateStock
-    );
+    const categoryObj = categories.find((c) => c.id === selectedCategoryId);
 
-    toast.success(
-      `Purchase ${newPO.id} recorded successfully! ${
-        updateStock ? "Inventory stock updated." : ""
-      }`
-    );
+    const subtotalMinor = subtotal * 100;
+    const discountMinor = discountAmount * 100;
+    const taxMinor = taxAmount * 100;
+    const totalMinor = grandTotal * 100;
+
+    const created = addPurchase({
+      business_id: "biz-aura",
+      branch_id: "Jhamsikhel",
+      category_id: selectedCategoryId || undefined,
+      category_name: categoryObj?.name || undefined,
+      supplier_id: selectedSupplierId === "custom" ? undefined : selectedSupplierId,
+      supplier_name: finalSupplierName,
+      reference_number: referenceNumber.trim() || undefined,
+      status: purchaseStatus,
+      subtotal_minor: subtotalMinor,
+      discount_minor: discountMinor,
+      tax_minor: taxMinor,
+      total_minor: totalMinor,
+      amount_paid_minor: 0,
+      currency: "NPR",
+      notes: notes.trim() || undefined,
+      received_at: purchaseStatus === "received" ? new Date().toISOString() : undefined,
+      items: validItems.map((item) => ({
+        productId: item.productId || `prod-${Date.now()}`,
+        productName: item.productName,
+        sku: item.sku,
+        qty: item.qty,
+        unit_cost_minor: item.unitCost * 100,
+        line_total_minor: item.qty * item.unitCost * 100,
+      })),
+    });
+
+    toast.success(`Purchase ${created.purchase_number} created successfully.`);
     setOpenNewPurchase(false);
 
     // Reset Form
     setSelectedSupplierId("");
-    setInvoiceRef("");
-    setDiscount(0);
-    setAmountPaid(0);
+    setCustomSupplierName("");
+    setSelectedCategoryId("");
+    setReferenceNumber("");
+    setPurchaseStatus("draft");
+    setDiscountAmount(0);
+    setApplyVat(true);
     setNotes("");
-    setItems([
-      {
-        productId: "",
-        productName: "",
-        sku: "",
-        category: "",
-        qty: 1,
-        unitType: "Bottle",
-        packSize: 1,
-        unitCost: 0,
-      },
-    ]);
+    setItems([{ productId: "", productName: "", sku: "", qty: 1, unitCost: 0 }]);
 
     refreshData();
   };
 
-  const handleSettleCredit = (poId: string) => {
-    markPurchasePaid(poId);
-    toast.success("Bill marked as Paid in full.");
+  // Status badge styling helper
+  const getStatusBadge = (st: PurchaseStatus) => {
+    switch (st) {
+      case "received":
+        return <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200">Received</Badge>;
+      case "ordered":
+        return <Badge className="bg-sky-100 text-sky-800 border-sky-200">Ordered</Badge>;
+      case "draft":
+        return <Badge variant="outline" className="text-muted-foreground">Draft</Badge>;
+      case "cancelled":
+        return <Badge className="bg-rose-100 text-rose-800 border-rose-200">Cancelled</Badge>;
+    }
+  };
+
+  // Payment status badge
+  const getPaymentBadge = (totalMinor: number, paidMinor: number) => {
+    if (paidMinor >= totalMinor && totalMinor > 0) {
+      return <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200">Paid</Badge>;
+    }
+    if (paidMinor > 0) {
+      return <Badge className="bg-amber-50 text-amber-700 border-amber-200">Partially Paid</Badge>;
+    }
+    return <Badge className="bg-rose-50 text-rose-700 border-rose-200">Unpaid</Badge>;
+  };
+
+  // Filter purchases
+  const filteredPurchases = useMemo(() => {
+    return purchases.filter((p) => {
+      const matchQ =
+        q === "" ||
+        p.purchase_number.toLowerCase().includes(q.toLowerCase()) ||
+        p.supplier_name.toLowerCase().includes(q.toLowerCase()) ||
+        (p.reference_number && p.reference_number.toLowerCase().includes(q.toLowerCase()));
+
+      const matchStatus = statusFilter === "All" || p.status === statusFilter;
+      const matchCat = categoryFilter === "All" || p.category_id === categoryFilter;
+
+      let matchPayment = true;
+      if (paymentFilter === "Paid") matchPayment = (p.amount_paid_minor || 0) >= p.total_minor;
+      else if (paymentFilter === "Partially Paid")
+        matchPayment = (p.amount_paid_minor || 0) > 0 && (p.amount_paid_minor || 0) < p.total_minor;
+      else if (paymentFilter === "Unpaid") matchPayment = (p.amount_paid_minor || 0) === 0;
+
+      return matchQ && matchStatus && matchCat && matchPayment;
+    });
+  }, [purchases, q, statusFilter, paymentFilter, categoryFilter]);
+
+  // Overall KPIs
+  const totalSpend = useMemo(
+    () => purchases.reduce((acc, p) => acc + (p.total_minor || 0) / 100, 0),
+    [purchases]
+  );
+  const totalPaid = useMemo(
+    () => purchases.reduce((acc, p) => acc + (p.amount_paid_minor || 0) / 100, 0),
+    [purchases]
+  );
+  const totalOutstanding = Math.max(0, totalSpend - totalPaid);
+
+  // Actions
+  const handleMarkReceived = (p: Purchase) => {
+    updatePurchaseStatus(p.id, "received");
+    toast.success(`Purchase ${p.purchase_number} marked as Received & stock updated.`);
     refreshData();
-    if (viewInvoice && viewInvoice.id === poId) {
-      setViewInvoice({ ...viewInvoice, paymentStatus: "Paid", amountPaid: viewInvoice.totalAmount });
+    if (viewPurchase && viewPurchase.id === p.id) {
+      setViewPurchase({ ...viewPurchase, status: "received", received_at: new Date().toISOString() });
+    }
+  };
+
+  const handleOpenPaymentDialog = (p: Purchase) => {
+    setPayTargetPurchase(p);
+    const balance = Math.max(0, (p.total_minor - (p.amount_paid_minor || 0)) / 100);
+    setPayAmount(balance);
+    setPayMethod("Bank Transfer");
+    setPayNote("");
+    setPaymentDialogOpen(true);
+  };
+
+  const handleRecordPaymentSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!payTargetPurchase || payAmount <= 0) {
+      toast.error("Please enter a valid payment amount.");
+      return;
+    }
+
+    recordPurchasePayment(
+      payTargetPurchase.id,
+      Math.round(payAmount * 100),
+      payMethod,
+      payNote.trim() || undefined
+    );
+
+    toast.success(`Payment of ${fmt(payAmount)} recorded for ${payTargetPurchase.purchase_number}.`);
+    setPaymentDialogOpen(false);
+    refreshData();
+
+    if (viewPurchase && viewPurchase.id === payTargetPurchase.id) {
+      setViewPurchase({
+        ...viewPurchase,
+        amount_paid_minor: (viewPurchase.amount_paid_minor || 0) + Math.round(payAmount * 100),
+      });
+      setPurchasePayments(getPurchasePayments(payTargetPurchase.id));
+    }
+  };
+
+  const handleOpenReturnDialog = (p: Purchase) => {
+    setReturnTargetPurchase(p);
+    setReturnReason("");
+    setReturnLines(
+      p.items.map((i) => ({
+        productId: i.productId,
+        productName: i.productName,
+        qty: 0,
+        unitCost: i.unit_cost_minor / 100,
+      }))
+    );
+    setReturnDialogOpen(true);
+  };
+
+  const handleReturnSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!returnTargetPurchase) return;
+
+    const validLines = returnLines.filter((l) => l.qty > 0);
+    if (validLines.length === 0) {
+      toast.error("Please specify at least one item quantity to return.");
+      return;
+    }
+
+    const totalRefundMinor = validLines.reduce((acc, l) => acc + l.qty * l.unitCost * 100, 0);
+
+    recordPurchaseReturn(
+      returnTargetPurchase.id,
+      returnReason.trim() || "Item Return / Damaged Stock",
+      totalRefundMinor,
+      validLines.map((l) => ({
+        product_id: l.productId,
+        product_name: l.productName,
+        quantity: l.qty,
+        refund_minor: l.qty * l.unitCost * 100,
+      }))
+    );
+
+    toast.success(`Return processed. Refund of ${fmt(totalRefundMinor / 100)} recorded.`);
+    setReturnDialogOpen(false);
+    refreshData();
+
+    if (viewPurchase && viewPurchase.id === returnTargetPurchase.id) {
+      setPurchaseReturns(getPurchaseReturns(returnTargetPurchase.id));
     }
   };
 
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Finance"
-        title="Purchases & Restock Orders"
-        description="Log vendor procurement bills, monitor supplier credit payables, and automatically sync incoming stock into inventory."
+        eyebrow="Procurement"
+        title="Purchases"
+        description="Record supplier purchase orders, track incoming stock deliveries, manage invoice payments and returns."
         actions={
           <div className="flex gap-2">
             <Button
@@ -372,359 +390,214 @@ function PurchasesPage() {
               onClick={() => navigate({ to: "/business/suppliers" })}
               className="rounded-xl border-border"
             >
-              <Truck className="h-4 w-4 mr-2" />
+              <Building2 className="h-4 w-4 mr-2" />
               Suppliers Directory
             </Button>
             <Dialog open={openNewPurchase} onOpenChange={setOpenNewPurchase}>
               <DialogTrigger asChild>
                 <Button className="rounded-xl bg-foreground text-background hover:bg-foreground/90">
                   <Plus className="h-4 w-4 mr-2" />
-                  Record Purchase
+                  New Purchase
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-3xl max-h-[92vh] overflow-y-auto p-6">
+              <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle className="font-serif text-2xl font-bold">
-                    Log Wholesale Purchase
-                  </DialogTitle>
+                  <DialogTitle className="font-serif text-xl">Create Purchase Order</DialogTitle>
                   <DialogDescription>
-                    Enter wholesale invoice items, payment terms, and automatically update warehouse stock counts.
+                    Record a procurement order from a supplier with items, tax, and delivery status.
                   </DialogDescription>
                 </DialogHeader>
 
-                <form onSubmit={handleSubmitPurchase} className="space-y-5 pt-2">
-                  {/* Top Bar: Supplier, Purchase Type, Date, Invoice Ref */}
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3 bg-sand-soft/50 p-3.5 rounded-xl">
-                    <div className="space-y-1">
-                      <div className="flex justify-between items-center">
-                        <label className="text-xs font-semibold text-muted-foreground">Supplier *</label>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setOpenNewPurchase(false);
-                            navigate({ to: "/business/suppliers" });
-                          }}
-                          className="text-[10px] text-primary hover:underline font-medium"
-                        >
-                          + New Vendor
-                        </button>
-                      </div>
-                      <Select value={selectedSupplierId} onValueChange={handleSupplierChange}>
-                        <SelectTrigger className="bg-background text-sm">
-                          <SelectValue placeholder="Select supplier..." />
-                        </SelectTrigger>
+                <form onSubmit={handleCreatePurchase} className="space-y-4 pt-2">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-foreground/80">Supplier *</label>
+                      <Select value={selectedSupplierId} onValueChange={handleSupplierSelect}>
+                        <SelectTrigger><SelectValue placeholder="Select supplier..." /></SelectTrigger>
                         <SelectContent>
                           {suppliers.map((s) => (
-                            <SelectItem key={s.id} value={s.id}>
-                              {s.name} ({s.paymentMethod})
-                            </SelectItem>
+                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                           ))}
+                          <SelectItem value="custom">+ Other / Custom Vendor</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-muted-foreground">Purchase Category</label>
-                      <Select
-                        value={purchaseType}
-                        onValueChange={(v: any) => setPurchaseType(v)}
-                      >
-                        <SelectTrigger className="bg-background text-sm">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {PURCHASE_TYPES.map((t) => (
-                            <SelectItem key={t} value={t}>
-                              {t}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-muted-foreground">Invoice Date</label>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-foreground/80">Supplier Invoice / Ref #</label>
                       <Input
-                        type="date"
-                        value={purchaseDate}
-                        onChange={(e) => setPurchaseDate(e.target.value)}
-                        className="bg-background text-sm"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-muted-foreground">Vendor Bill / Ref #</label>
-                      <Input
-                        placeholder="e.g. INV-8821"
-                        value={invoiceRef}
-                        onChange={(e) => setInvoiceRef(e.target.value)}
-                        className="bg-background text-sm font-mono"
+                        placeholder="e.g. INV-LOR-8891"
+                        value={referenceNumber}
+                        onChange={(e) => setReferenceNumber(e.target.value)}
                       />
                     </div>
                   </div>
 
-                  {/* Line Items Entry Section */}
-                  <div className="space-y-2">
+                  {selectedSupplierId === "custom" && (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-foreground/80">Vendor Display Name *</label>
+                      <Input
+                        placeholder="Enter vendor or merchant name"
+                        value={customSupplierName}
+                        onChange={(e) => setCustomSupplierName(e.target.value)}
+                        required
+                      />
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-foreground/80">Purchase Category</label>
+                      <Select value={selectedCategoryId} onValueChange={setSelectedCategoryId}>
+                        <SelectTrigger><SelectValue placeholder="Select category..." /></SelectTrigger>
+                        <SelectContent>
+                          {categories.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold text-foreground/80">Order Status</label>
+                      <Select value={purchaseStatus} onValueChange={(v: PurchaseStatus) => setPurchaseStatus(v)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="draft">Draft (Saved for review)</SelectItem>
+                          <SelectItem value="ordered">Ordered (Sent to supplier)</SelectItem>
+                          <SelectItem value="received">Received (Stock added to inventory)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {/* Line Items */}
+                  <div className="space-y-2 pt-2 border-t border-border">
                     <div className="flex items-center justify-between">
-                      <h4 className="text-xs uppercase font-bold tracking-wider text-muted-foreground">
-                        Purchased Items ({items.length})
-                      </h4>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={handleAddItem}
-                        className="h-7 text-xs rounded-lg"
-                      >
-                        <Plus className="h-3.5 w-3.5 mr-1" /> Add Line Item
+                      <label className="text-xs font-semibold text-foreground/80">Items Purchased</label>
+                      <Button type="button" size="sm" variant="outline" onClick={addItem} className="h-7 text-xs">
+                        <Plus className="h-3 w-3 mr-1" /> Add Item
                       </Button>
                     </div>
 
-                    <div className="border border-border rounded-xl overflow-hidden">
-                      <table className="w-full text-xs">
-                        <thead className="bg-sand-soft/60 text-[11px] uppercase tracking-wider text-muted-foreground">
-                          <tr>
-                            <th className="text-left px-3 py-2">Product Item *</th>
-                            <th className="text-left px-3 py-2 w-28">Packaging Unit</th>
-                            <th className="text-left px-3 py-2 w-20">Units / Pack</th>
-                            <th className="text-left px-3 py-2 w-20">Qty Bought</th>
-                            <th className="text-left px-3 py-2 w-28">Pack Cost ({fmt(1).slice(0, 1)})</th>
-                            <th className="text-right px-3 py-2 w-24">Total</th>
-                            <th className="w-8"></th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border">
-                          {items.map((item, index) => {
-                            const totalStockUnits = (item.qty || 0) * (item.packSize || 1);
-                            const lineTotal = (item.qty || 0) * (item.unitCost || 0);
+                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                      {items.map((item, idx) => (
+                        <div key={idx} className="p-3 rounded-xl border border-border bg-sand-soft/20 flex gap-2 items-center text-xs">
+                          <div className="flex-1">
+                            <Select
+                              value={item.productId}
+                              onValueChange={(val) => handleProductSelect(idx, val)}
+                            >
+                              <SelectTrigger className="h-8 text-xs bg-background">
+                                <SelectValue placeholder="Select product..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {products.map((p) => (
+                                  <SelectItem key={p.id} value={p.id}>
+                                    {p.name} {p.sku ? `(${p.sku})` : ""}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
 
-                            return (
-                              <tr key={index} className="bg-card">
-                                <td className="p-2">
-                                  <Select
-                                    value={item.productId}
-                                    onValueChange={(val) => handleItemProductSelect(index, val)}
-                                  >
-                                    <SelectTrigger className="h-8 text-xs bg-background">
-                                      <SelectValue placeholder="Choose product..." />
-                                    </SelectTrigger>
-                                    <SelectContent className="max-h-56">
-                                      {products.map((p) => (
-                                        <SelectItem key={p.id} value={p.id}>
-                                          {p.name} ({p.sku}) · Stock: {p.stock}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </td>
+                          <div className="w-20">
+                            <Input
+                              type="number"
+                              min="1"
+                              placeholder="Qty"
+                              value={item.qty}
+                              onChange={(e) => updateItemField(idx, "qty", Number(e.target.value))}
+                              className="h-8 text-xs text-center bg-background"
+                            />
+                          </div>
 
-                                <td className="p-2">
-                                  <Select
-                                    value={item.unitType}
-                                    onValueChange={(v) => handleItemChange(index, "unitType", v)}
-                                  >
-                                    <SelectTrigger className="h-8 text-xs bg-background">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {UNIT_TYPES.map((u) => (
-                                        <SelectItem key={u} value={u}>
-                                          {u}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </td>
+                          <div className="w-28">
+                            <Input
+                              type="number"
+                              min="0"
+                              placeholder="Cost (NPR)"
+                              value={item.unitCost}
+                              onChange={(e) => updateItemField(idx, "unitCost", Number(e.target.value))}
+                              className="h-8 text-xs text-right bg-background"
+                            />
+                          </div>
 
-                                <td className="p-2">
-                                  <Input
-                                    type="number"
-                                    min={1}
-                                    value={item.packSize}
-                                    onChange={(e) =>
-                                      handleItemChange(index, "packSize", Number(e.target.value))
-                                    }
-                                    className="h-8 text-xs bg-background"
-                                    title="Number of single bottles/pieces in 1 pack or carton"
-                                  />
-                                </td>
+                          <div className="w-28 text-right font-medium text-foreground">
+                            {fmt(item.qty * item.unitCost)}
+                          </div>
 
-                                <td className="p-2">
-                                  <Input
-                                    type="number"
-                                    min={1}
-                                    value={item.qty}
-                                    onChange={(e) =>
-                                      handleItemChange(index, "qty", Number(e.target.value))
-                                    }
-                                    className="h-8 text-xs bg-background font-semibold"
-                                  />
-                                </td>
-
-                                <td className="p-2">
-                                  <Input
-                                    type="number"
-                                    min={0}
-                                    value={item.unitCost || ""}
-                                    onChange={(e) =>
-                                      handleItemChange(index, "unitCost", Number(e.target.value))
-                                    }
-                                    className="h-8 text-xs bg-background"
-                                  />
-                                </td>
-
-                                <td className="p-2 text-right font-mono font-semibold text-foreground">
-                                  {fmt(lineTotal)}
-                                  {item.packSize > 1 && (
-                                    <div className="text-[10px] text-muted-foreground font-normal">
-                                      +{totalStockUnits} into stock
-                                    </div>
-                                  )}
-                                </td>
-
-                                <td className="p-2 text-center">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemoveItem(index)}
-                                    className="text-muted-foreground hover:text-rose p-1 transition"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </button>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                          {items.length > 1 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeItem(idx)}
+                              className="h-8 w-8 p-0 text-muted-foreground hover:text-rose-500"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   </div>
 
-                  {/* Financial & Payment Settlement Section */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-border pt-3">
-                    {/* Payment Settings */}
-                    <div className="space-y-3">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                        Payment & Terms
-                      </h4>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-1">
-                          <label className="text-xs text-muted-foreground font-medium">Payment Method</label>
-                          <Select
-                            value={paymentMethod}
-                            onValueChange={(v: any) => setPaymentMethod(v)}
-                          >
-                            <SelectTrigger className="h-9 text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Cash">Cash</SelectItem>
-                              <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                              <SelectItem value="Credit">Credit (Pay Later)</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="text-xs text-muted-foreground font-medium">Payment Status</label>
-                          <Select
-                            value={paymentStatus}
-                            onValueChange={(v: any) => setPaymentStatus(v)}
-                          >
-                            <SelectTrigger className="h-9 text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Paid">Paid in Full</SelectItem>
-                              <SelectItem value="Credit (Unpaid)">Credit (Unpaid)</SelectItem>
-                              <SelectItem value="Partially Paid">Partially Paid</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-
-                      {paymentStatus !== "Paid" && (
-                        <div className="grid grid-cols-2 gap-2 bg-amber-50/70 border border-amber-200 p-2.5 rounded-xl">
-                          <div className="space-y-1">
-                            <label className="text-xs text-amber-900 font-medium">Amount Paid Now</label>
-                            <Input
-                              type="number"
-                              value={amountPaid || ""}
-                              onChange={(e) => setAmountPaid(Number(e.target.value))}
-                              placeholder="0"
-                              className="h-8 text-xs bg-background"
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <label className="text-xs text-amber-900 font-medium">Credit Due Date</label>
-                            <Input
-                              type="date"
-                              value={creditDueDate}
-                              onChange={(e) => setCreditDueDate(e.target.value)}
-                              className="h-8 text-xs bg-background"
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="space-y-1">
-                        <label className="text-xs text-muted-foreground font-medium">Notes</label>
-                        <Input
-                          placeholder="Special discount note, delivery remark..."
-                          value={notes}
-                          onChange={(e) => setNotes(e.target.value)}
-                          className="h-8 text-xs"
-                        />
-                      </div>
+                  {/* Pricing Summary */}
+                  <div className="p-3.5 rounded-xl border border-border bg-card space-y-2 text-xs">
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Subtotal:</span>
+                      <span className="font-medium text-foreground">{fmt(subtotal)}</span>
                     </div>
 
-                    {/* Cost Summary Box */}
-                    <div className="bg-sand-soft/60 rounded-xl p-4 flex flex-col justify-between space-y-3">
-                      <div className="space-y-2 text-xs">
-                        <div className="flex justify-between text-muted-foreground">
-                          <span>Subtotal ({items.length} items):</span>
-                          <span className="font-mono font-medium text-foreground">{fmt(subtotal)}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-muted-foreground">
-                          <span>Wholesale Discount:</span>
-                          <div className="flex items-center gap-1 w-28">
-                            <span className="text-xs font-mono">{fmt(1).slice(0, 1)}</span>
-                            <Input
-                              type="number"
-                              min={0}
-                              value={discount || ""}
-                              onChange={(e) => setDiscount(Number(e.target.value))}
-                              className="h-7 text-xs bg-background"
-                              placeholder="0"
-                            />
-                          </div>
-                        </div>
-                        <div className="border-t border-border pt-2 flex justify-between items-baseline font-serif text-lg font-bold text-foreground">
-                          <span>Grand Total:</span>
-                          <span className="font-mono text-xl text-primary">{fmt(grandTotal)}</span>
-                        </div>
-                      </div>
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-muted-foreground">Discount (NPR):</span>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={discountAmount}
+                        onChange={(e) => setDiscountAmount(Number(e.target.value))}
+                        className="h-7 w-28 text-xs text-right"
+                      />
+                    </div>
 
-                      {/* Stock Auto Sync Toggle */}
-                      <div className="flex items-center justify-between border-t border-border/80 pt-3">
-                        <div>
-                          <div className="text-xs font-semibold text-foreground">Auto-Increment Stock</div>
-                          <div className="text-[10px] text-muted-foreground">
-                            Instantly adds quantities into Inventory
-                          </div>
-                        </div>
+                    <div className="flex items-center justify-between">
+                      <label className="text-muted-foreground flex items-center gap-1.5 cursor-pointer">
                         <input
                           type="checkbox"
-                          checked={updateStock}
-                          onChange={(e) => setUpdateStock(e.target.checked)}
-                          className="h-4 w-4 rounded text-primary focus:ring-primary"
+                          checked={applyVat}
+                          onChange={(e) => setApplyVat(e.target.checked)}
+                          className="rounded border-border text-primary"
                         />
-                      </div>
+                        <span>Apply 13% VAT</span>
+                      </label>
+                      <span className="font-medium text-foreground">{fmt(taxAmount)}</span>
+                    </div>
+
+                    <div className="pt-2 border-t border-border flex justify-between font-bold text-sm text-foreground">
+                      <span>Grand Total:</span>
+                      <span>{fmt(grandTotal)}</span>
                     </div>
                   </div>
 
-                  <Button type="submit" className="w-full bg-primary text-primary-foreground hover:bg-primary/95 rounded-xl h-11 text-sm font-semibold">
-                    Complete Purchase Order & Sync Stock
-                  </Button>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-foreground/80">Notes</label>
+                    <Textarea
+                      rows={2}
+                      placeholder="e.g. Terms, delivery instructions, or inspection notes..."
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="pt-3 border-t border-border flex justify-end gap-2">
+                    <Button type="button" variant="outline" onClick={() => setOpenNewPurchase(false)}>
+                      Cancel
+                    </Button>
+                    <Button type="submit" className="bg-foreground text-background hover:bg-foreground/90">
+                      Save Purchase Order
+                    </Button>
+                  </div>
                 </form>
               </DialogContent>
             </Dialog>
@@ -732,90 +605,85 @@ function PurchasesPage() {
         }
       />
 
-      {/* KPI Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="rounded-2xl border border-border bg-card p-4 brg-card-shadow">
-          <div className="h-9 w-9 rounded-xl grid place-items-center mb-3 bg-sand-soft">
-            <ShoppingCart className="h-4 w-4 text-deep-olive" />
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-subtle">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">Total Purchases Value</span>
+            <ShoppingCart className="h-4 w-4 text-primary" />
           </div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Total Purchases</div>
-          <div className="font-serif text-2xl mt-1 text-foreground">{fmt(totalSpend)}</div>
+          <div className="mt-2 text-2xl font-serif font-bold text-foreground">{fmt(totalSpend)}</div>
+          <div className="mt-1 text-xs text-muted-foreground">{purchases.length} total orders recorded</div>
         </div>
 
-        <div className="rounded-2xl border border-border bg-card p-4 brg-card-shadow">
-          <div className="h-9 w-9 rounded-xl grid place-items-center mb-3 bg-rose-soft">
-            <Clock className="h-4 w-4 text-rose" />
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-subtle">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">Total Payments Made</span>
+            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
           </div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Payable Credit</div>
-          <div className="font-serif text-2xl mt-1 text-foreground">{fmt(unpaidCredit)}</div>
+          <div className="mt-2 text-2xl font-serif font-bold text-emerald-600">{fmt(totalPaid)}</div>
+          <div className="mt-1 text-xs text-muted-foreground">Cleared against supplier invoices</div>
         </div>
 
-        <div className="rounded-2xl border border-border bg-card p-4 brg-card-shadow">
-          <div className="h-9 w-9 rounded-xl grid place-items-center mb-3 bg-mist-soft">
-            <FileText className="h-4 w-4 text-deep-olive" />
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-subtle">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">Outstanding Supplier Payables</span>
+            <AlertCircle className="h-4 w-4 text-amber-600" />
           </div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Total Invoices</div>
-          <div className="font-serif text-2xl mt-1 text-foreground">{purchases.length}</div>
-        </div>
-
-        <div className="rounded-2xl border border-border bg-card p-4 brg-card-shadow">
-          <div className="h-9 w-9 rounded-xl grid place-items-center mb-3 bg-[color-mix(in_oklab,var(--sage)_25%,white)]">
-            <CreditCard className="h-4 w-4 text-deep-olive" />
-          </div>
-          <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Avg Order Size</div>
-          <div className="font-serif text-2xl mt-1 text-foreground">{fmt(avgOrder)}</div>
+          <div className="mt-2 text-2xl font-serif font-bold text-amber-600">{fmt(totalOutstanding)}</div>
+          <div className="mt-1 text-xs text-muted-foreground">Pending payment clearance</div>
         </div>
       </div>
 
-      {/* Search & Filters */}
-      <div className="flex flex-col md:flex-row gap-3">
-        <div className="relative flex-1">
+      {/* Filter Bar */}
+      <div className="flex flex-col lg:flex-row gap-3 items-center justify-between bg-card p-3 rounded-2xl border border-border shadow-subtle">
+        <div className="relative w-full lg:w-80">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input
+          <Input
+            placeholder="Search by PUR number, vendor, bill ref…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search by PO ID, Invoice #, Supplier, or Product name…"
-            className="w-full h-11 pl-10 pr-4 rounded-xl border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring/40"
+            className="pl-9 h-9 text-xs rounded-xl bg-background border-border"
           />
         </div>
 
-        <div className="flex flex-wrap gap-2 items-center">
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="h-11 w-36 rounded-xl text-xs">
-              <SelectValue placeholder="Purchase Type" />
+        <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-end text-xs">
+          {/* Status Filter */}
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="h-9 w-32 text-xs bg-background">
+              <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="All">All Categories</SelectItem>
-              {PURCHASE_TYPES.map((t) => (
-                <SelectItem key={t} value={t}>
-                  {t}
-                </SelectItem>
-              ))}
+              <SelectItem value="All">All Statuses</SelectItem>
+              <SelectItem value="draft">Draft</SelectItem>
+              <SelectItem value="ordered">Ordered</SelectItem>
+              <SelectItem value="received">Received</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
 
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="h-11 w-36 rounded-xl text-xs">
+          {/* Payment Filter */}
+          <Select value={paymentFilter} onValueChange={setPaymentFilter}>
+            <SelectTrigger className="h-9 w-36 text-xs bg-background">
               <SelectValue placeholder="Payment" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="All">All Payments</SelectItem>
               <SelectItem value="Paid">Paid</SelectItem>
-              <SelectItem value="Credit (Unpaid)">Credit (Unpaid)</SelectItem>
               <SelectItem value="Partially Paid">Partially Paid</SelectItem>
+              <SelectItem value="Unpaid">Unpaid</SelectItem>
             </SelectContent>
           </Select>
 
-          <Select value={supplierFilter} onValueChange={setSupplierFilter}>
-            <SelectTrigger className="h-11 w-40 rounded-xl text-xs">
-              <SelectValue placeholder="Supplier" />
+          {/* Category Filter */}
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="h-9 w-44 text-xs bg-background">
+              <SelectValue placeholder="Category" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="All">All Suppliers</SelectItem>
-              {suppliers.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  {s.name}
-                </SelectItem>
+              <SelectItem value="All">All Categories</SelectItem>
+              {categories.map((c) => (
+                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -823,116 +691,114 @@ function PurchasesPage() {
       </div>
 
       {/* Purchases Table */}
-      <div className="rounded-2xl border border-border bg-card overflow-hidden brg-card-shadow">
+      <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-subtle">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-sand-soft/60 text-[11px] uppercase tracking-wider text-muted-foreground">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-sand-soft/50 border-b border-border text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
               <tr>
-                <th className="text-left px-4 py-3">PO & Invoice #</th>
-                <th className="text-left px-4 py-3">Date</th>
-                <th className="text-left px-4 py-3">Supplier</th>
-                <th className="text-left px-4 py-3">Purchase Category</th>
-                <th className="text-left px-4 py-3">Items Summary</th>
-                <th className="text-left px-4 py-3">Payment Status</th>
-                <th className="text-right px-4 py-3">Total Amount</th>
-                <th className="px-4 py-3"></th>
+                <th className="px-5 py-3">Purchase #</th>
+                <th className="px-4 py-3">Supplier / Vendor</th>
+                <th className="px-4 py-3">Category</th>
+                <th className="px-4 py-3">Order Status</th>
+                <th className="px-4 py-3">Payment</th>
+                <th className="px-4 py-3 text-right">Total Amount</th>
+                <th className="px-5 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-border">
               {filteredPurchases.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-12 text-muted-foreground text-sm">
-                    <ShoppingCart className="h-8 w-8 mx-auto mb-2 opacity-30" />
-                    No purchases found matching criteria.
+                  <td colSpan={7} className="text-center py-12 text-muted-foreground">
+                    <ShoppingCart className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                    No purchases match your criteria.
                   </td>
                 </tr>
               ) : (
-                filteredPurchases.map((po) => {
-                  const isPaid = po.paymentStatus === "Paid";
+                filteredPurchases.map((p) => {
+                  const totalNpr = (p.total_minor || 0) / 100;
+                  const paidNpr = (p.amount_paid_minor || 0) / 100;
+                  const balance = Math.max(0, totalNpr - paidNpr);
+
                   return (
-                    <tr
-                      key={po.id}
-                      onClick={() => setViewInvoice(po)}
-                      className="border-t border-border hover:bg-sand-soft/30 transition-colors cursor-pointer"
-                    >
-                      <td className="px-4 py-3">
-                        <div className="font-semibold text-foreground font-mono">{po.id}</div>
-                        {po.invoiceRef && (
-                          <div className="text-xs font-mono text-muted-foreground">
-                            {po.invoiceRef}
+                    <tr key={p.id} className="hover:bg-sand-soft/30 transition-colors">
+                      <td className="px-5 py-3.5">
+                        <div className="font-mono font-semibold text-foreground text-xs">{p.purchase_number}</div>
+                        <div className="text-[11px] text-muted-foreground mt-0.5">
+                          {p.created_at.slice(0, 10)}
+                          {p.reference_number && ` · Bill: ${p.reference_number}`}
+                        </div>
+                      </td>
+
+                      <td className="px-4 py-3.5">
+                        <div className="font-medium text-foreground text-xs">{p.supplier_name}</div>
+                        <div className="text-[11px] text-muted-foreground">{p.items?.length || 0} items</div>
+                      </td>
+
+                      <td className="px-4 py-3.5 text-xs text-muted-foreground">
+                        {p.category_name || "General"}
+                      </td>
+
+                      <td className="px-4 py-3.5">
+                        {getStatusBadge(p.status)}
+                        {p.status === "received" && p.received_at && (
+                          <div className="text-[10px] text-muted-foreground mt-0.5">
+                            Recv: {p.received_at.slice(0, 10)}
                           </div>
                         )}
                       </td>
 
-                      <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
-                        {po.date}
+                      <td className="px-4 py-3.5">
+                        {getPaymentBadge(p.total_minor, p.amount_paid_minor || 0)}
+                        {balance > 0 && (
+                          <div className="text-[10px] text-rose-500 font-medium mt-0.5">
+                            Due: {fmt(balance)}
+                          </div>
+                        )}
                       </td>
 
-                      <td className="px-4 py-3">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate({
-                              to: "/business/suppliers",
-                              search: { supplierId: po.supplierId } as any,
-                            });
-                          }}
-                          className="font-medium text-foreground hover:underline text-left inline-flex items-center gap-1 group"
-                        >
-                          {po.supplierName}
-                          <ChevronRight className="h-3 w-3 text-muted-foreground group-hover:text-foreground transition" />
-                        </button>
-                        <div className="text-[11px] text-muted-foreground">{po.paymentMethod}</div>
+                      <td className="px-4 py-3.5 text-right">
+                        <div className="font-bold text-foreground text-xs">{fmt(totalNpr)}</div>
+                        {paidNpr > 0 && paidNpr < totalNpr && (
+                          <div className="text-[10px] text-muted-foreground">Paid: {fmt(paidNpr)}</div>
+                        )}
                       </td>
 
-                      <td className="px-4 py-3">
-                        <span className="text-xs px-2 py-0.5 rounded-md bg-sand-soft border border-border text-foreground/80 font-medium">
-                          {po.purchaseType}
-                        </span>
-                      </td>
+                      <td className="px-5 py-3.5 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setViewPurchase(p)}
+                            className="h-7 text-xs px-2"
+                          >
+                            <Eye className="h-3.5 w-3.5 mr-1" />
+                            View
+                          </Button>
 
-                      <td className="px-4 py-3 text-xs text-muted-foreground max-w-xs truncate">
-                        <span className="font-medium text-foreground">
-                          {po.items.length} {po.items.length === 1 ? "item" : "items"}:
-                        </span>{" "}
-                        {po.items.map((i) => `${i.qty}x ${i.productName}`).join(", ")}
-                      </td>
-
-                      <td className="px-4 py-3">
-                        <span
-                          className={cn(
-                            "text-xs px-2 py-0.5 rounded-full border font-medium",
-                            isPaid
-                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                              : "bg-amber-50 text-amber-800 border-amber-200"
+                          {p.status !== "received" && p.status !== "cancelled" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleMarkReceived(p)}
+                              className="h-7 text-xs px-2 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                            >
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                              Receive
+                            </Button>
                           )}
-                        >
-                          {po.paymentStatus}
-                        </span>
-                        {!isPaid && po.creditDueDate && (
-                          <div className="text-[10px] text-rose mt-0.5 font-medium">
-                            Due: {po.creditDueDate}
-                          </div>
-                        )}
-                      </td>
 
-                      <td className="px-4 py-3 text-right font-mono font-bold text-foreground">
-                        {fmt(po.totalAmount)}
-                      </td>
-
-                      <td className="px-4 py-3 text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setViewInvoice(po);
-                          }}
-                        >
-                          <Eye className="h-4 w-4 text-muted-foreground" />
-                        </Button>
+                          {balance > 0 && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleOpenPaymentDialog(p)}
+                              className="h-7 text-xs px-2 border-border"
+                            >
+                              <CreditCard className="h-3 w-3 mr-1" />
+                              Pay
+                            </Button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -943,121 +809,316 @@ function PurchasesPage() {
         </div>
       </div>
 
-      {/* Invoice Detail Dialog */}
-      <Dialog open={!!viewInvoice} onOpenChange={(open) => !open && setViewInvoice(null)}>
-        <DialogContent className="max-w-xl p-6">
-          {viewInvoice && (
-            <div className="space-y-4">
-              <DialogHeader>
-                <div className="flex items-center justify-between">
-                  <Badge variant={viewInvoice.paymentStatus === "Paid" ? "default" : "secondary"}>
-                    {viewInvoice.paymentStatus}
-                  </Badge>
-                  <span className="text-xs text-muted-foreground font-mono">
-                    Recorded: {viewInvoice.date}
+      {/* View Purchase Detail Dialog */}
+      {viewPurchase && (
+        <Dialog open={Boolean(viewPurchase)} onOpenChange={(open) => !open && setViewPurchase(null)}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader className="border-b border-border pb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <DialogTitle className="font-mono text-lg">{viewPurchase.purchase_number}</DialogTitle>
+                  <DialogDescription>
+                    Vendor: {viewPurchase.supplier_name} {viewPurchase.reference_number ? `· Bill: ${viewPurchase.reference_number}` : ""}
+                  </DialogDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  {getStatusBadge(viewPurchase.status)}
+                  {getPaymentBadge(viewPurchase.total_minor, viewPurchase.amount_paid_minor || 0)}
+                </div>
+              </div>
+            </DialogHeader>
+
+            <div className="space-y-5 pt-2 text-xs">
+              {/* Order Info */}
+              <div className="grid grid-cols-3 gap-3 p-3 bg-sand-soft/30 rounded-xl border border-border">
+                <div>
+                  <span className="text-muted-foreground block text-[11px]">Created Date</span>
+                  <span className="font-medium text-foreground">{viewPurchase.created_at.slice(0, 10)}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block text-[11px]">Received At</span>
+                  <span className="font-medium text-foreground">
+                    {viewPurchase.received_at ? viewPurchase.received_at.slice(0, 16).replace("T", " ") : "Pending Delivery"}
                   </span>
                 </div>
-                <DialogTitle className="font-serif text-2xl font-bold mt-1">
-                  Purchase Order #{viewInvoice.id}
-                </DialogTitle>
-                <DialogDescription>
-                  Supplier:{" "}
-                  <button
-                    onClick={() => {
-                      setViewInvoice(null);
-                      navigate({
-                        to: "/business/suppliers",
-                        search: { supplierId: viewInvoice.supplierId } as any,
-                      });
-                    }}
-                    className="font-medium text-foreground underline hover:text-primary"
-                  >
-                    {viewInvoice.supplierName}
-                  </button>{" "}
-                  · Invoice: {viewInvoice.invoiceRef || "N/A"}
-                </DialogDescription>
-              </DialogHeader>
+                <div>
+                  <span className="text-muted-foreground block text-[11px]">Branch</span>
+                  <span className="font-medium text-foreground">{viewPurchase.branch_id}</span>
+                </div>
+              </div>
 
-              {/* Items Breakdown */}
-              <div className="border border-border rounded-xl overflow-hidden text-xs">
-                <table className="w-full">
-                  <thead className="bg-sand-soft text-muted-foreground uppercase text-[10px]">
-                    <tr>
-                      <th className="text-left p-2.5">Item</th>
-                      <th className="text-center p-2.5">Packaging</th>
-                      <th className="text-center p-2.5">Qty</th>
-                      <th className="text-right p-2.5">Unit Cost</th>
-                      <th className="text-right p-2.5">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {viewInvoice.items.map((it, idx) => (
-                      <tr key={idx}>
-                        <td className="p-2.5 font-medium text-foreground">
-                          {it.productName}
-                          <div className="text-[10px] text-muted-foreground font-mono">{it.sku}</div>
-                        </td>
-                        <td className="p-2.5 text-center text-muted-foreground">
-                          {it.unitType} {it.packSize > 1 ? `(${it.packSize}/pk)` : ""}
-                        </td>
-                        <td className="p-2.5 text-center font-bold">{it.qty}</td>
-                        <td className="p-2.5 text-right font-mono">{fmt(it.unitCost)}</td>
-                        <td className="p-2.5 text-right font-mono font-bold text-foreground">
-                          {fmt(it.lineTotal)}
-                        </td>
+              {/* Items Table */}
+              <div>
+                <h4 className="font-semibold text-sm mb-2 text-foreground">Line Items</h4>
+                <div className="border border-border rounded-xl overflow-hidden">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-sand-soft/50 border-b border-border text-muted-foreground uppercase text-[10px]">
+                      <tr>
+                        <th className="p-2.5">Product Name</th>
+                        <th className="p-2.5 text-center">Qty</th>
+                        <th className="p-2.5 text-right">Unit Cost</th>
+                        <th className="p-2.5 text-right">Total</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {viewPurchase.items.map((it, idx) => (
+                        <tr key={idx}>
+                          <td className="p-2.5 font-medium">{it.productName}</td>
+                          <td className="p-2.5 text-center">{it.qty}</td>
+                          <td className="p-2.5 text-right">{fmt(it.unit_cost_minor / 100)}</td>
+                          <td className="p-2.5 text-right font-semibold">{fmt(it.line_total_minor / 100)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
               {/* Financial Summary */}
-              <div className="bg-sand-soft/50 rounded-xl p-3 space-y-1.5 text-xs">
+              <div className="p-3.5 rounded-xl border border-border bg-card space-y-1.5">
                 <div className="flex justify-between text-muted-foreground">
                   <span>Subtotal:</span>
-                  <span className="font-mono">{fmt(viewInvoice.subtotal)}</span>
+                  <span>{fmt(viewPurchase.subtotal_minor / 100)}</span>
                 </div>
-                {viewInvoice.discount > 0 && (
-                  <div className="flex justify-between text-emerald-700">
+                {viewPurchase.discount_minor > 0 && (
+                  <div className="flex justify-between text-muted-foreground">
                     <span>Discount:</span>
-                    <span className="font-mono">-{fmt(viewInvoice.discount)}</span>
+                    <span>−{fmt(viewPurchase.discount_minor / 100)}</span>
                   </div>
                 )}
-                <div className="flex justify-between font-bold text-sm text-foreground border-t border-border pt-1">
+                {viewPurchase.tax_minor > 0 && (
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>VAT (13%):</span>
+                    <span>{fmt(viewPurchase.tax_minor / 100)}</span>
+                  </div>
+                )}
+                <div className="pt-2 border-t border-border flex justify-between font-bold text-sm text-foreground">
                   <span>Total Amount:</span>
-                  <span className="font-mono text-primary">{fmt(viewInvoice.totalAmount)}</span>
+                  <span>{fmt(viewPurchase.total_minor / 100)}</span>
                 </div>
-                {viewInvoice.paymentStatus !== "Paid" && (
-                  <div className="flex justify-between text-rose font-medium pt-1">
-                    <span>Due Date:</span>
-                    <span>{viewInvoice.creditDueDate || "Per credit agreement"}</span>
+                <div className="flex justify-between text-emerald-600 font-semibold pt-1">
+                  <span>Amount Paid:</span>
+                  <span>{fmt((viewPurchase.amount_paid_minor || 0) / 100)}</span>
+                </div>
+                <div className="flex justify-between text-rose-500 font-semibold">
+                  <span>Balance Due:</span>
+                  <span>{fmt(Math.max(0, (viewPurchase.total_minor - (viewPurchase.amount_paid_minor || 0)) / 100))}</span>
+                </div>
+              </div>
+
+              {/* Payment Records Section */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold text-sm text-foreground">Payment History</h4>
+                  {(viewPurchase.total_minor - (viewPurchase.amount_paid_minor || 0)) > 0 && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleOpenPaymentDialog(viewPurchase)}
+                      className="h-7 text-xs border-border"
+                    >
+                      <CreditCard className="h-3 w-3 mr-1" />
+                      Record Payment
+                    </Button>
+                  )}
+                </div>
+
+                {purchasePayments.length === 0 ? (
+                  <div className="p-3 border border-dashed rounded-xl text-center text-muted-foreground">
+                    No payment transactions recorded for this order yet.
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {purchasePayments.map((pm) => (
+                      <div key={pm.id} className="p-2.5 rounded-xl border border-border bg-card flex justify-between items-center">
+                        <div>
+                          <div className="font-semibold text-foreground">{fmt(pm.amount_minor / 100)} via {pm.method || "Cash"}</div>
+                          <div className="text-muted-foreground text-[10px] mt-0.5">
+                            {pm.paid_at.slice(0, 16).replace("T", " ")} · {pm.created_by}
+                            {pm.note && ` · Note: ${pm.note}`}
+                          </div>
+                        </div>
+                        <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px]">Paid</Badge>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
 
-              {/* Bottom Actions */}
-              <div className="flex gap-2 justify-end pt-2">
-                {viewInvoice.paymentStatus !== "Paid" && (
-                  <Button
-                    className="bg-emerald-700 text-white hover:bg-emerald-800 rounded-xl text-xs"
-                    onClick={() => handleSettleCredit(viewInvoice.id)}
-                  >
-                    <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
-                    Mark as Paid / Settled
-                  </Button>
+              {/* Purchase Returns Section */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-semibold text-sm text-foreground">Returns & Refunds</h4>
+                  {viewPurchase.status === "received" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleOpenReturnDialog(viewPurchase)}
+                      className="h-7 text-xs border-border text-rose-600 hover:bg-rose-50"
+                    >
+                      <RotateCcw className="h-3 w-3 mr-1" />
+                      Return Items
+                    </Button>
+                  )}
+                </div>
+
+                {purchaseReturns.length === 0 ? (
+                  <div className="p-3 border border-dashed rounded-xl text-center text-muted-foreground">
+                    No items returned for this purchase.
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {purchaseReturns.map((rt) => (
+                      <div key={rt.id} className="p-2.5 rounded-xl border border-border bg-rose-50/40 dark:bg-rose-950/20 flex justify-between items-center">
+                        <div>
+                          <div className="font-semibold text-rose-700 dark:text-rose-400">
+                            Refund: {fmt(rt.refund_minor / 100)} · Reason: {rt.reason || "Returned items"}
+                          </div>
+                          <div className="text-muted-foreground text-[10px] mt-0.5">
+                            {rt.created_at.slice(0, 16).replace("T", " ")} · {rt.lines.map((l) => `${l.quantity}x ${l.product_name}`).join(", ")}
+                          </div>
+                        </div>
+                        <Badge className="bg-rose-100 text-rose-800 border-rose-200 text-[10px]">Returned</Badge>
+                      </div>
+                    ))}
+                  </div>
                 )}
-                <Button
-                  variant="outline"
-                  className="rounded-xl text-xs"
-                  onClick={() => setViewInvoice(null)}
-                >
-                  Close
-                </Button>
               </div>
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Record Payment Dialog */}
+      {payTargetPurchase && (
+        <Dialog open={paymentDialogOpen} onOpenChange={setPaymentDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="font-serif text-lg">Record Purchase Payment</DialogTitle>
+              <DialogDescription>
+                Record a payment clearance for {payTargetPurchase.purchase_number} ({payTargetPurchase.supplier_name}).
+              </DialogDescription>
+            </DialogHeader>
+
+            <form onSubmit={handleRecordPaymentSubmit} className="space-y-4 pt-2">
+              <div className="p-3 bg-sand-soft/30 rounded-xl border border-border text-xs flex justify-between">
+                <span className="text-muted-foreground">Total Invoice:</span>
+                <span className="font-bold text-foreground">{fmt(payTargetPurchase.total_minor / 100)}</span>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground/80">Amount to Pay (NPR) *</label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={payAmount}
+                  onChange={(e) => setPayAmount(Number(e.target.value))}
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground/80">Payment Method</label>
+                <Select value={payMethod} onValueChange={setPayMethod}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Bank Transfer">Bank Transfer / Wire</SelectItem>
+                    <SelectItem value="eSewa">eSewa Merchant</SelectItem>
+                    <SelectItem value="Khalti">Khalti</SelectItem>
+                    <SelectItem value="Cash">Cash at Counter</SelectItem>
+                    <SelectItem value="Cheque">Bank Cheque</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground/80">Payment Reference / Note</label>
+                <Input
+                  placeholder="e.g. NIC Asia Txn #991204"
+                  value={payNote}
+                  onChange={(e) => setPayNote(e.target.value)}
+                />
+              </div>
+
+              <div className="pt-2 border-t border-border flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setPaymentDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" className="bg-foreground text-background hover:bg-foreground/90">
+                  Save Payment
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Purchase Return Dialog */}
+      {returnTargetPurchase && (
+        <Dialog open={returnDialogOpen} onOpenChange={setReturnDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="font-serif text-lg">Process Purchase Return</DialogTitle>
+              <DialogDescription>
+                Return damaged or excess goods from {returnTargetPurchase.purchase_number}.
+              </DialogDescription>
+            </DialogHeader>
+
+            <form onSubmit={handleReturnSubmit} className="space-y-4 pt-2">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground/80">Select Quantities to Return</label>
+                <div className="space-y-2 border border-border p-2.5 rounded-xl bg-sand-soft/20 text-xs">
+                  {returnLines.map((line, idx) => (
+                    <div key={idx} className="flex items-center justify-between gap-2">
+                      <span className="truncate flex-1 font-medium">{line.productName}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-muted-foreground text-[11px]">Qty:</span>
+                        <Input
+                          type="number"
+                          min="0"
+                          value={line.qty}
+                          onChange={(e) => {
+                            const copy = [...returnLines];
+                            copy[idx].qty = Number(e.target.value);
+                            setReturnLines(copy);
+                          }}
+                          className="h-7 w-16 text-center text-xs"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground/80">Reason for Return *</label>
+                <Input
+                  placeholder="e.g. Broken seal, damaged packaging, or wrong shade"
+                  value={returnReason}
+                  onChange={(e) => setReturnReason(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="p-3 bg-rose-50/50 dark:bg-rose-950/20 rounded-xl border border-rose-200 dark:border-rose-900 text-xs flex justify-between">
+                <span className="text-rose-700 dark:text-rose-300 font-medium">Estimated Refund:</span>
+                <span className="font-bold text-rose-700 dark:text-rose-300">
+                  {fmt(returnLines.reduce((acc, l) => acc + l.qty * l.unitCost, 0))}
+                </span>
+              </div>
+
+              <div className="pt-2 border-t border-border flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setReturnDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" className="bg-rose-600 text-white hover:bg-rose-700">
+                  Confirm Return
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

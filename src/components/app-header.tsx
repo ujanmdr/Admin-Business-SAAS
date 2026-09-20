@@ -9,6 +9,7 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { NotificationDropdown } from "@/components/NotificationDropdown";
 
 const titles: Record<string, string> = {
   "/": "Overview",
@@ -63,29 +64,7 @@ export function AppHeader() {
           <Sun className="h-4 w-4" />
         </Button>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative text-muted-foreground hover:text-foreground">
-              <Bell className="h-4 w-4" />
-              <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-[oklch(0.605_0.110_70)]" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-80">
-            <DropdownMenuLabel className="font-serif">Notifications</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {[
-              { t: "3 new business approvals waiting", s: "10 min ago" },
-              { t: "Settlement of रू 1,84,000 due today", s: "1 hr ago" },
-              { t: "Review reported on Glow Avenue Salon", s: "2 hr ago" },
-              { t: "Refund pending over 72h", s: "Yesterday" },
-            ].map((n, i) => (
-              <DropdownMenuItem key={i} className="flex flex-col items-start gap-0.5 py-2.5">
-                <span className="text-sm text-foreground">{n.t}</span>
-                <span className="text-[11px] text-muted-foreground">{n.s}</span>
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <NotificationDropdown role="admin" />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

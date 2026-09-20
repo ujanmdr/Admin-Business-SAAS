@@ -1,4 +1,4 @@
-﻿import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, useRef } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -11,12 +11,12 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { StatusBadge } from "@/components/admin-ui";
 import { bookings, npr } from "@/lib/mock-data";
 import { useBusiness } from "@/components/BusinessProvider";
-import { getTickets, createTicket, addTicketMessage, handleBotInteraction, getFaqs, Ticket } from "@/lib/support";
+import { getTickets, createTicket, addTicketMessage, handleBotInteraction, getFaqs, FAQItem, Ticket } from "@/lib/support";
 import { LifeBuoy, Send, BookOpen, Clock, AlertTriangle, CheckCircle, ChevronDown, ChevronUp, Cpu } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/business/support")({
-  head: () => ({ meta: [{ title: "Support Â· BRG Suite" }] }),
+  head: () => ({ meta: [{ title: "Support · BRG Suite" }] }),
   component: SupportPage,
 });
 
@@ -24,6 +24,7 @@ export function SupportPage() {
   const { business } = useBusiness();
   const [ticketsList, setTicketsList] = useState<Ticket[]>([]);
   const [activeFAQ, setActiveFAQ] = useState<number | null>(null);
+  const [faqs, setFaqs] = useState<FAQItem[]>([]);
 
   // Form State
   const [type, setType] = useState<string>("Booking issue");
@@ -59,23 +60,39 @@ export function SupportPage() {
     }
   };
 
+  const loadFaqs = () => {
+    setFaqs(getFaqs());
+  };
+
   useEffect(() => {
     loadTickets();
+    loadFaqs();
 
     const handleSync = () => {
       loadTickets();
     };
 
-    window.addEventListener("storage_tickets_updated", handleSync);
-    window.addEventListener("storage", (e) => {
+    const handleFaqsSync = () => {
+      loadFaqs();
+    };
+
+    const handleStorage = (e: StorageEvent) => {
       if (e.key === "brg_tickets") {
         loadTickets();
       }
-    });
+      if (e.key === "brg_faqs") {
+        loadFaqs();
+      }
+    };
+
+    window.addEventListener("storage_tickets_updated", handleSync);
+    window.addEventListener("storage_faqs_updated", handleFaqsSync);
+    window.addEventListener("storage", handleStorage);
 
     return () => {
       window.removeEventListener("storage_tickets_updated", handleSync);
-      window.removeEventListener("storage", handleSync);
+      window.removeEventListener("storage_faqs_updated", handleFaqsSync);
+      window.removeEventListener("storage", handleStorage);
     };
   }, [business, selectedTicket?.id]);
 
@@ -125,7 +142,7 @@ export function SupportPage() {
       loadTickets();
       
       // If it was escalated in the process
-      if (selectedTicket.assigned.includes("ðŸ¤–") && updated.assigned !== "ðŸ¤– BRG Helper Bot") {
+      if (selectedTicket.assigned.includes("🤖") && updated.assigned !== "🤖 BRG Helper Bot") {
         toast.info(`Ticket escalated to human representative: ${updated.assigned}`);
       } else {
         toast.success("Reply sent.");
@@ -142,7 +159,7 @@ export function SupportPage() {
       loadTickets();
       
       // Alert user if escalated
-      if (updated.assigned !== "ðŸ¤– BRG Helper Bot") {
+      if (updated.assigned !== "🤖 BRG Helper Bot") {
         toast.info(`Escalated to Support: ${updated.assigned}`);
       } else if (option === "Yes, issue is resolved") {
         toast.success("Issue resolved successfully!");
@@ -268,7 +285,7 @@ export function SupportPage() {
               <CardDescription>Instant answers to common merchant questions.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2 p-4">
-              {getFaqs().map((faq, index) => {
+              {faqs.map((faq, index) => {
                 const isOpen = activeFAQ === index;
                 return (
                   <div key={index} className="border-b border-border last:border-0 pb-2">
@@ -338,7 +355,7 @@ export function SupportPage() {
                             {t.booking}
                           </span>
                         ) : (
-                          <span className="text-muted-foreground">â€”</span>
+                          <span className="text-muted-foreground">—</span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-muted-foreground text-xs">{t.created}</td>
@@ -450,7 +467,7 @@ export function SupportPage() {
                               <form onSubmit={handleSendReply} className="flex gap-2">
                                 <Input
                                   placeholder={
-                                    t.assigned.includes("ðŸ¤–")
+                                    t.assigned.includes("🤖")
                                       ? "Type a custom reply here to auto-escalate to a human representative..."
                                       : "Type your reply message to the support agent..."
                                   }
@@ -479,5 +496,3 @@ export function SupportPage() {
     </div>
   );
 }
-
-

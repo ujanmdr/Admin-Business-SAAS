@@ -1,7 +1,8 @@
 import {
   LayoutDashboard, Calendar, BookOpen, Users, UserCog, Sparkles, Package, BadgeCheck,
   Gift, Heart, CreditCard, ShoppingBag, Boxes, Tag, Film, Star, Megaphone, GraduationCap,
-  BarChart3, Settings, Handshake, Receipt, LifeBuoy, ShoppingCart, Truck
+  BarChart3, Settings, Handshake, Receipt, LifeBuoy, ShoppingCart, Truck, FileText,
+  TrendingUp, Percent
 } from "lucide-react";
 
 export type NavItem = { label: string; to: string; icon: any; group: string };
@@ -22,10 +23,13 @@ export const navItems: NavItem[] = [
 
   { label: "Payments", to: "/business/payments", icon: CreditCard, group: "Finance" },
   { label: "POS", to: "/business/pos", icon: ShoppingBag, group: "Finance" },
+  { label: "Daily Sales", to: "/business/reports?tab=daily-sales", icon: TrendingUp, group: "Finance" },
+  { label: "Daily VAT", to: "/business/reports?tab=daily-vat", icon: Percent, group: "Finance" },
   { label: "Inventory", to: "/business/inventory", icon: Boxes, group: "Finance" },
   { label: "Purchases", to: "/business/purchases", icon: ShoppingCart, group: "Finance" },
   { label: "Suppliers", to: "/business/suppliers", icon: Truck, group: "Finance" },
   { label: "Expenses", to: "/business/expenses", icon: Receipt, group: "Finance" },
+  { label: "Invoice Settings", to: "/business/invoice-settings", icon: FileText, group: "Finance" },
 
   { label: "Offers", to: "/business/offers", icon: Tag, group: "Growth" },
   { label: "Reels & Content", to: "/business/reels", icon: Film, group: "Growth" },
@@ -47,6 +51,7 @@ export const receptionistNavItems: NavItem[] = [
   { label: "Front Desk", to: "/staff", icon: LayoutDashboard, group: "Daily" },
   { label: "Calendar", to: "/staff/calendar", icon: Calendar, group: "Daily" },
   { label: "POS Billing", to: "/staff/pos", icon: ShoppingBag, group: "Daily" },
+  { label: "Daily Sales", to: "/business/reports?tab=daily-sales", icon: TrendingUp, group: "Daily" },
   { label: "Bookings", to: "/staff/bookings", icon: BookOpen, group: "Daily" },
   { label: "Customers", to: "/staff/customers", icon: Users, group: "Front Office" },
   { label: "Payments", to: "/staff/payments", icon: CreditCard, group: "Front Office" },
@@ -64,4 +69,3 @@ export const providerNavItems: NavItem[] = [
 ];
 
 export const staffNavItems: NavItem[] = receptionistNavItems;
-

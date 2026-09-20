@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
-import { GIFT_CARDS, GiftCard, fmt } from "@/lib/programs-data";
+import { GIFT_CARDS, GIFT_CARD_DESIGNS, GiftCard, fmt } from "@/lib/programs-data";
 import { Plus, Gift, Wallet, CheckCircle2, Clock, Search, Send, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +28,16 @@ function statusTone(s: GiftCard["status"]) {
 function GiftCardsPage() {
   const [q, setQ] = useState("");
   const [issuing, setIssuing] = useState(false);
+
+  // Gift Card Creator State
+  const [selectedDesign, setSelectedDesign] = useState("gold");
+  const [amount, setAmount] = useState(5000);
+  const [sender, setSender] = useState("");
+  const [recipient, setRecipient] = useState("");
+  const [recipientPhone, setRecipientPhone] = useState("+977 98 ");
+  const [message, setMessage] = useState("");
+  const [deliveryDate, setDeliveryDate] = useState("");
+  const [expiry, setExpiry] = useState("12 months");
 
   const rows = useMemo(
     () => GIFT_CARDS.filter((g) =>
@@ -125,7 +135,18 @@ function GiftCardsPage() {
             <tbody>
               {rows.map((g) => (
                 <tr key={g.id} className="border-t border-border hover:bg-sand-soft/30">
-                  <td className="px-4 py-3 font-mono text-xs">{g.code}</td>
+                  <td className="px-4 py-3 font-mono text-xs flex items-center gap-2">
+                    {(() => {
+                      const d = GIFT_CARD_DESIGNS.find((item) => item.id === g.designId);
+                      return (
+                        <span
+                          className={cn("h-2.5 w-2.5 rounded-full inline-block shrink-0", d?.dot || "bg-border")}
+                          title={d?.name || "Default Theme"}
+                        />
+                      );
+                    })()}
+                    {g.code}
+                  </td>
                   <td className="px-4 py-3">
                     <div className="text-sm">{g.sender} → <span className="font-medium">{g.recipient}</span></div>
                     <div className="text-xs text-muted-foreground">{g.recipientPhone}</div>
@@ -152,31 +173,146 @@ function GiftCardsPage() {
 
       {/* Issue modal */}
       <Dialog open={issuing} onOpenChange={setIssuing}>
-        <DialogContent className="max-w-lg bg-background">
-          <DialogHeader><DialogTitle className="font-serif text-2xl">Issue gift card</DialogTitle></DialogHeader>
-          <div className="space-y-3 py-2">
-            <div className="grid grid-cols-3 gap-2">
-              {[3000, 5000, 10000, 15000, 20000, 25000].map((v) => (
-                <button key={v} className="rounded-xl border border-border bg-card hover:bg-sand-soft px-3 py-3 font-serif text-base">{fmt(v)}</button>
-              ))}
+        <DialogContent className="max-w-3xl bg-background">
+          <DialogHeader>
+            <DialogTitle className="font-serif text-2xl">Issue gift card</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-2">
+            {/* Left Column: Configurator Form */}
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Select Amount</label>
+                <div className="grid grid-cols-3 gap-2 mt-1.5">
+                  {[3000, 5000, 10000, 15000, 20000, 25000].map((v) => (
+                    <button
+                      type="button"
+                      key={v}
+                      onClick={() => setAmount(v)}
+                      className={cn(
+                        "rounded-xl border px-3 py-2 font-serif text-sm transition-colors",
+                        amount === v ? "border-foreground bg-foreground text-background" : "border-border bg-card hover:bg-sand-soft"
+                      )}
+                    >
+                      {fmt(v)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Design Template Picker */}
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Select Card Design</label>
+                <div className="flex gap-3 mt-2">
+                  {GIFT_CARD_DESIGNS.map((d) => (
+                    <button
+                      type="button"
+                      key={d.id}
+                      onClick={() => setSelectedDesign(d.id)}
+                      title={d.name}
+                      className={cn(
+                        "h-9 w-9 rounded-full border-2 flex items-center justify-center transition-all hover:scale-105",
+                        selectedDesign === d.id ? "border-foreground scale-110 shadow-md" : "border-transparent"
+                      )}
+                    >
+                      <span className={cn("h-7 w-7 rounded-full block border border-black/10", d.dot)} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-medium">Sender Name</label>
+                  <Input className="mt-1" value={sender} onChange={(e) => setSender(e.target.value)} placeholder="E.g. Pratima Joshi" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs font-medium">Recipient Name</label>
+                    <Input className="mt-1" value={recipient} onChange={(e) => setRecipient(e.target.value)} placeholder="E.g. Sneha Karki" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium">Recipient Phone</label>
+                    <Input className="mt-1" value={recipientPhone} onChange={(e) => setRecipientPhone(e.target.value)} />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-medium">Personal Message</label>
+                  <Textarea rows={2} className="mt-1" value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Write a sweet message..." />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs font-medium flex items-center gap-1"><Calendar className="h-3 w-3" />Delivery Date</label>
+                    <Input type="date" className="mt-1" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium">Expiry Validity</label>
+                    <Input className="mt-1" value={expiry} onChange={(e) => setExpiry(e.target.value)} />
+                  </div>
+                </div>
+              </div>
             </div>
-            <div><label className="text-xs font-medium">Sender name</label><Input className="mt-1" /></div>
-            <div className="grid grid-cols-2 gap-2">
-              <div><label className="text-xs font-medium">Recipient name</label><Input className="mt-1" /></div>
-              <div><label className="text-xs font-medium">Recipient phone</label><Input className="mt-1" defaultValue="+977 98 " /></div>
-            </div>
-            <div><label className="text-xs font-medium">Personal message</label><Textarea rows={2} className="mt-1" placeholder="Happy birthday darling…" /></div>
-            <div className="grid grid-cols-2 gap-2">
-              <div><label className="text-xs font-medium flex items-center gap-1"><Calendar className="h-3 w-3" />Delivery date</label><Input type="date" className="mt-1" /></div>
-              <div><label className="text-xs font-medium">Expiry</label><Input className="mt-1" defaultValue="12 months" /></div>
+
+            {/* Right Column: Live Card Preview & Actions */}
+            <div className="flex flex-col justify-between border-t md:border-t-0 md:border-l border-border pt-6 md:pt-0 md:pl-6">
+              <div>
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block mb-3">Live Card Preview</label>
+                
+                {(() => {
+                  const d = GIFT_CARD_DESIGNS.find((item) => item.id === selectedDesign) || GIFT_CARD_DESIGNS[0];
+                  return (
+                    <div className={cn(
+                      "w-full aspect-[1.586/1] rounded-2xl p-6 bg-gradient-to-br shadow-xl flex flex-col justify-between relative overflow-hidden transition-all duration-300",
+                      d.gradient,
+                      d.text
+                    )}>
+                      {/* Decorative elements */}
+                      <div className="absolute right-[-10%] top-[-20%] w-[50%] aspect-square rounded-full bg-white/10 blur-2xl pointer-events-none" />
+                      <div className="absolute left-[-5%] bottom-[-10%] w-[30%] aspect-square rounded-full bg-black/5 blur-xl pointer-events-none" />
+
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="text-[9px] uppercase tracking-[0.2em] opacity-80 font-mono">Platform Gift</div>
+                          <div className="font-serif text-lg font-semibold mt-0.5">Aura Spa & Salon</div>
+                        </div>
+                        <Gift className="h-5 w-5 opacity-80" />
+                      </div>
+
+                      {message ? (
+                        <p className="text-xs italic line-clamp-2 max-w-[85%] mt-2 opacity-95">"{message}"</p>
+                      ) : (
+                        <p className="text-xs italic mt-2 opacity-50">"Happy birthday! Enjoy your pampering session..."</p>
+                      )}
+
+                      <div className="flex justify-between items-end mt-4">
+                        <div className="min-w-0">
+                          <div className="text-[9px] uppercase tracking-wider opacity-70">For</div>
+                          <div className="text-sm font-semibold truncate leading-tight">{recipient || "Recipient Name"}</div>
+                          <div className="text-[9px] opacity-75 mt-0.5">From: {sender || "Sender Name"}</div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className="text-[9px] uppercase tracking-wider opacity-70">Value</div>
+                          <div className="font-serif text-xl font-bold">{fmt(amount)}</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+                
+                <div className="mt-4 p-3 bg-sand-soft/50 border border-border rounded-xl text-[11px] text-muted-foreground space-y-1">
+                  <div>• Deliver to: <b>{recipientPhone}</b></div>
+                  <div>• Scheduled for: <b>{deliveryDate || "Instant delivery"}</b></div>
+                  <div>• Expiration: <b>{expiry}</b></div>
+                </div>
+              </div>
+
+              <DialogFooter className="mt-6 md:mt-0 pt-4 border-t border-border flex justify-end gap-2">
+                <Button variant="outline" className="rounded-xl" onClick={() => setIssuing(false)}>Cancel</Button>
+                <Button className="rounded-xl bg-foreground text-background hover:bg-foreground/90" onClick={() => setIssuing(false)}>
+                  <Send className="h-4 w-4" />Issue & schedule
+                </Button>
+              </DialogFooter>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIssuing(false)}>Cancel</Button>
-            <Button className="bg-foreground text-background hover:bg-foreground/90" onClick={() => setIssuing(false)}>
-              <Send className="h-4 w-4" />Issue & schedule
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

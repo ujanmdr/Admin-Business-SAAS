@@ -1,4 +1,4 @@
-﻿import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -12,15 +12,60 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { InvoiceModal } from "@/components/invoice/InvoiceModal";
+import type { InvoiceData } from "@/components/invoice/InvoiceDocument";
+import { getWhatsAppShareUrl } from "@/lib/invoice-utils";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/business/payments")({
-  head: () => ({ meta: [{ title: "Payments Â· BRG Suite" }] }),
+  head: () => ({ meta: [{ title: "Payments · BRG Suite" }] }),
   component: PaymentsPage,
 });
+
+function paymentToInvoiceData(p: (typeof PAYMENTS)[0]): InvoiceData {
+  const subtotal = Math.round(p.amount / 1.13);
+  const tax = p.amount - subtotal;
+  const [datePart, timePart] = p.date.split(" ");
+
+  return {
+    invoiceNo: p.id,
+    orderNo: p.reference.replace(/[^0-9]/g, "").slice(0, 4) || "512",
+    date: datePart || "2026-05-06",
+    time: timePart || "10:42 AM",
+    orderType: p.refType || "Service Payment",
+    deliveryStaff: p.staff,
+    customer: {
+      name: p.customer,
+      phone: "+977 9841000000",
+      pan: "601" + p.id.replace(/\D/g, ""),
+      address: `${p.branch}, Nepal`,
+    },
+    items: [
+      {
+        sn: 1,
+        hsCode: p.refType === "POS" ? "33.04" : "96.01",
+        particular: p.reference,
+        rate: subtotal,
+        qty: 1,
+        amount: subtotal,
+      },
+    ],
+    itemTotal: subtotal,
+    loyaltyDiscount: 0,
+    offerDiscount: 0,
+    subtotal,
+    tax,
+    total: p.amount,
+    paymentMethod: p.method,
+    status: p.status === "Paid" ? "Paid" : "Estimate",
+    notes: `Settlement status: ${p.settlement}. Processed at ${p.branch} branch.`,
+  };
+}
 
 export function PaymentsPage() {
   const [q, setQ] = useState("");
   const [method, setMethod] = useState<"All" | PayMethod>("All");
+  const [invoiceModalData, setInvoiceModalData] = useState<InvoiceData | null>(null);
 
   const collected = PAYMENTS.filter((p) => p.status === "Paid").reduce((s, p) => s + p.amount, 0);
   const pending = PAYMENTS.filter((p) => p.status === "Pending").reduce((s, p) => s + p.amount, 0);
@@ -99,7 +144,7 @@ export function PaymentsPage() {
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Search by customer, reference, payment IDâ€¦"
+                placeholder="Search by customer, reference, payment ID…"
                 className="w-full h-11 pl-10 pr-4 rounded-xl border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring/40"
               />
             </div>
@@ -130,7 +175,7 @@ export function PaymentsPage() {
                     <th className="text-left px-4 py-3">Amount</th>
                     <th className="text-left px-4 py-3">Method</th>
                     <th className="text-left px-4 py-3">Status</th>
-                    <th className="text-left px-4 py-3">Branch Â· Staff</th>
+                    <th className="text-left px-4 py-3">Branch · Staff</th>
                     <th className="text-left px-4 py-3">Settlement</th>
                     <th className="px-4 py-3"></th>
                   </tr>
@@ -162,10 +207,15 @@ export function PaymentsPage() {
                             <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem><Eye className="h-4 w-4" />View receipt</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setInvoiceModalData(paymentToInvoiceData(p))}><Eye className="h-4 w-4" />View receipt</DropdownMenuItem>
                             <DropdownMenuItem><CheckCircle2 className="h-4 w-4" />Mark cash paid</DropdownMenuItem>
-                            <DropdownMenuItem><Download className="h-4 w-4" />Download invoice</DropdownMenuItem>
-                            <DropdownMenuItem><MessageCircle className="h-4 w-4" />Send on WhatsApp</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setInvoiceModalData(paymentToInvoiceData(p))}><Download className="h-4 w-4" />Download invoice</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => {
+                              const inv = paymentToInvoiceData(p);
+                              const url = getWhatsAppShareUrl(inv, "Aura Beauty Lounge");
+                              window.open(url, "_blank");
+                              toast.success("WhatsApp opened for " + p.customer);
+                            }}><MessageCircle className="h-4 w-4" />Send on WhatsApp</DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem className="text-rose"><RefreshCcw className="h-4 w-4" />Refund</DropdownMenuItem>
                           </DropdownMenuContent>
@@ -214,7 +264,7 @@ export function PaymentsPage() {
                     <td className="px-4 py-3 text-xs">{s.date}</td>
                     <td className="px-4 py-3">{s.marketplaceBookings}</td>
                     <td className="px-4 py-3">{fmt(s.gross)}</td>
-                    <td className="px-4 py-3 text-rose">âˆ’{fmt(s.brgCommission)}</td>
+                    <td className="px-4 py-3 text-rose">−{fmt(s.brgCommission)}</td>
                     <td className="px-4 py-3 font-medium">{fmt(s.businessEarning)}</td>
                     <td className="px-4 py-3">
                       <span className={cn(
@@ -233,7 +283,12 @@ export function PaymentsPage() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <InvoiceModal
+        isOpen={Boolean(invoiceModalData)}
+        bill={invoiceModalData}
+        onClose={() => setInvoiceModalData(null)}
+      />
     </div>
   );
 }
-

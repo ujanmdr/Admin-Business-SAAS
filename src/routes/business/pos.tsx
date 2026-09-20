@@ -1,4 +1,4 @@
-﻿import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BillReceipt, type BillData } from "@/components/BillReceipt";
+import { InvoiceModal } from "@/components/invoice/InvoiceModal";
+import type { InvoiceData } from "@/components/invoice/InvoiceDocument";
 import { attemptRedeem, LOYALTY_SALON_ID, type LoyaltyRedemption, incrementCustomerStamps, cancelRedeem, lookUpCodesByPhone, useLoyaltyRedemptions } from "@/lib/loyalty-program-data";
 import { usePosStore } from "@/lib/pos-store";
 import { toast } from "sonner";
@@ -84,6 +86,7 @@ export function POSPage() {
   const [tipAmt, setTipAmt] = useState(0);
 
   const [bill, setBill] = useState<BillData | null>(null);
+  const [invoiceModalData, setInvoiceModalData] = useState<InvoiceData | null>(null);
   
   // Loyalty redemption states
   const [showRedeem, setShowRedeem] = useState(false);
@@ -186,6 +189,38 @@ export function POSPage() {
     const now = new Date();
     const pad = (n: number) => String(n).padStart(2, "0");
     const invoiceNo = `INV-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+    const custObj = CUSTOMERS.find((c) => c.name === customer);
+    setInvoiceModalData({
+      invoiceNo,
+      orderNo: "512",
+      date: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
+      time: `${pad(now.getHours())}:${pad(now.getMinutes())}`,
+      orderType: "POS Sale",
+      deliveryStaff: cart.find(c => c.staff)?.staff || "Anisha",
+      customer: {
+        name: customer,
+        phone: custObj?.phone || "+977 9800000000",
+        pan: "601" + (custObj?.phone?.replace(/\D/g, "").slice(-7) || "1234567"),
+        address: "Jhamsikhel, Lalitpur",
+      },
+      items: cart.map((c, i) => ({
+        sn: i + 1,
+        particular: c.loyaltyFree ? `${c.name} (Loyalty Reward)` : c.name,
+        rate: c.loyaltyFree ? 0 : c.price,
+        qty: c.qty,
+        amount: (c.loyaltyFree ? 0 : c.price) * c.qty,
+        staff: c.staff,
+      })),
+      itemTotal: subtotal,
+      offerDiscount: discountAmt,
+      subtotal: subtotal - discountAmt,
+      serviceCharge: tipAmt,
+      tax: vat,
+      total: total,
+      paymentMethod: method,
+      status: "Paid",
+      notes: tipAmt > 0 ? `Includes gratuity/tip: ${fmt(tipAmt)}` : undefined,
+    });
     setBill({
       invoiceNo,
       date: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`,
@@ -211,6 +246,7 @@ export function POSPage() {
       if (serviceIds.length > 0) incrementCustomerStamps(custObj.id, serviceIds);
     }
     setBill(null);
+    setInvoiceModalData(null);
     setCart([]);
     setCustomer("Walk-in");
     setAppliedRedemption(null);
@@ -599,7 +635,12 @@ export function POSPage() {
           </div>
         </div>
       </div>
-      {bill && <BillReceipt bill={bill} onClose={closeBill} />}
+      <InvoiceModal
+        isOpen={Boolean(invoiceModalData)}
+        bill={invoiceModalData}
+        onClose={closeBill}
+      />
+      {bill && !invoiceModalData && <BillReceipt bill={bill} onClose={closeBill} />}
     </div>
   );
 }

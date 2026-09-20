@@ -42,6 +42,7 @@ import { Route as BusinessMembershipsRouteImport } from './routes/business/membe
 import { Route as BusinessMarketingRouteImport } from './routes/business/marketing'
 import { Route as BusinessLoyaltyReportRouteImport } from './routes/business/loyalty-report'
 import { Route as BusinessLoyaltyRouteImport } from './routes/business/loyalty'
+import { Route as BusinessInvoiceSettingsRouteImport } from './routes/business/invoice-settings'
 import { Route as BusinessInventoryRouteImport } from './routes/business/inventory'
 import { Route as BusinessGiftCardsRouteImport } from './routes/business/gift-cards'
 import { Route as BusinessExpensesRouteImport } from './routes/business/expenses'
@@ -235,6 +236,11 @@ const BusinessLoyaltyRoute = BusinessLoyaltyRouteImport.update({
   path: '/loyalty',
   getParentRoute: () => BusinessRoute,
 } as any)
+const BusinessInvoiceSettingsRoute = BusinessInvoiceSettingsRouteImport.update({
+  id: '/invoice-settings',
+  path: '/invoice-settings',
+  getParentRoute: () => BusinessRoute,
+} as any)
 const BusinessInventoryRoute = BusinessInventoryRouteImport.update({
   id: '/inventory',
   path: '/inventory',
@@ -403,6 +409,7 @@ export interface FileRoutesByFullPath {
   '/business/expenses': typeof BusinessExpensesRoute
   '/business/gift-cards': typeof BusinessGiftCardsRoute
   '/business/inventory': typeof BusinessInventoryRoute
+  '/business/invoice-settings': typeof BusinessInvoiceSettingsRoute
   '/business/loyalty': typeof BusinessLoyaltyRoute
   '/business/loyalty-report': typeof BusinessLoyaltyReportRoute
   '/business/marketing': typeof BusinessMarketingRoute
@@ -462,6 +469,7 @@ export interface FileRoutesByTo {
   '/business/expenses': typeof BusinessExpensesRoute
   '/business/gift-cards': typeof BusinessGiftCardsRoute
   '/business/inventory': typeof BusinessInventoryRoute
+  '/business/invoice-settings': typeof BusinessInvoiceSettingsRoute
   '/business/loyalty': typeof BusinessLoyaltyRoute
   '/business/loyalty-report': typeof BusinessLoyaltyReportRoute
   '/business/marketing': typeof BusinessMarketingRoute
@@ -525,6 +533,7 @@ export interface FileRoutesById {
   '/business/expenses': typeof BusinessExpensesRoute
   '/business/gift-cards': typeof BusinessGiftCardsRoute
   '/business/inventory': typeof BusinessInventoryRoute
+  '/business/invoice-settings': typeof BusinessInvoiceSettingsRoute
   '/business/loyalty': typeof BusinessLoyaltyRoute
   '/business/loyalty-report': typeof BusinessLoyaltyReportRoute
   '/business/marketing': typeof BusinessMarketingRoute
@@ -589,6 +598,7 @@ export interface FileRouteTypes {
     | '/business/expenses'
     | '/business/gift-cards'
     | '/business/inventory'
+    | '/business/invoice-settings'
     | '/business/loyalty'
     | '/business/loyalty-report'
     | '/business/marketing'
@@ -648,6 +658,7 @@ export interface FileRouteTypes {
     | '/business/expenses'
     | '/business/gift-cards'
     | '/business/inventory'
+    | '/business/invoice-settings'
     | '/business/loyalty'
     | '/business/loyalty-report'
     | '/business/marketing'
@@ -710,6 +721,7 @@ export interface FileRouteTypes {
     | '/business/expenses'
     | '/business/gift-cards'
     | '/business/inventory'
+    | '/business/invoice-settings'
     | '/business/loyalty'
     | '/business/loyalty-report'
     | '/business/marketing'
@@ -981,6 +993,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BusinessLoyaltyRouteImport
       parentRoute: typeof BusinessRoute
     }
+    '/business/invoice-settings': {
+      id: '/business/invoice-settings'
+      path: '/invoice-settings'
+      fullPath: '/business/invoice-settings'
+      preLoaderRoute: typeof BusinessInvoiceSettingsRouteImport
+      parentRoute: typeof BusinessRoute
+    }
     '/business/inventory': {
       id: '/business/inventory'
       path: '/inventory'
@@ -1231,6 +1250,7 @@ interface BusinessRouteChildren {
   BusinessExpensesRoute: typeof BusinessExpensesRoute
   BusinessGiftCardsRoute: typeof BusinessGiftCardsRoute
   BusinessInventoryRoute: typeof BusinessInventoryRoute
+  BusinessInvoiceSettingsRoute: typeof BusinessInvoiceSettingsRoute
   BusinessLoyaltyRoute: typeof BusinessLoyaltyRoute
   BusinessLoyaltyReportRoute: typeof BusinessLoyaltyReportRoute
   BusinessMarketingRoute: typeof BusinessMarketingRoute
@@ -1261,6 +1281,7 @@ const BusinessRouteChildren: BusinessRouteChildren = {
   BusinessExpensesRoute: BusinessExpensesRoute,
   BusinessGiftCardsRoute: BusinessGiftCardsRoute,
   BusinessInventoryRoute: BusinessInventoryRoute,
+  BusinessInvoiceSettingsRoute: BusinessInvoiceSettingsRoute,
   BusinessLoyaltyRoute: BusinessLoyaltyRoute,
   BusinessLoyaltyReportRoute: BusinessLoyaltyReportRoute,
   BusinessMarketingRoute: BusinessMarketingRoute,

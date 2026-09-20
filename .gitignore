@@ -30,3 +30,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Desktop non-repo folders
+BRG Business Suite/
+GRAIN-ROT-AnkerGames/
