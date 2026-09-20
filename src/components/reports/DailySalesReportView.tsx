@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { getDailySalesReport, DailySalesReportData } from "@/lib/reports-data";
 import { FinancialWaterfall } from "./FinancialWaterfall";
+import { HourlySalesTraffic } from "./HourlySalesTraffic";
 import { branches } from "@/lib/nav";
 import { fmt } from "@/lib/finance-data";
 import { cn } from "@/lib/utils";
@@ -190,29 +191,91 @@ export function DailySalesReportView({ initialDate = "2026-09-19" }: { initialDa
       {/* Modern Financial Waterfall Component */}
       <FinancialWaterfall summary={summary} currency={report.currency} />
 
+      {/* Hourly Client Footfall & Rush Pattern */}
+      {report.hourly_sales && report.hourly_sales.length > 0 && (
+        <HourlySalesTraffic hourlySales={report.hourly_sales} />
+      )}
+
       {/* Two Column Section: Payments & Sold Items */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Payment Methods Breakdown */}
-        <div className="rounded-2xl border border-border bg-card p-4 shadow-subtle space-y-3">
+        {/* Payment Methods Breakdown with Cash/Digital Reconciliation */}
+        <div className="rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-subtle space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold text-sm text-foreground flex items-center gap-2">
-              <Wallet className="h-4 w-4 text-primary" /> Payment Methods Collected
+              <Wallet className="h-4 w-4 text-primary" /> Payment Collections & Cash Audit
             </h3>
             <span className="text-xs text-muted-foreground font-semibold">
               Total: {fmt(payments.reduce((acc, p) => acc + p.amount_minor, 0) / 100)}
             </span>
           </div>
 
-          <div className="divide-y divide-border">
-            {payments.map((p, idx) => (
-              <div key={idx} className="py-2.5 flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="font-medium">{p.method}</Badge>
+          {/* Payment Proportional Allocation Bar */}
+          {(() => {
+            const totalCollected = payments.reduce((acc, p) => acc + p.amount_minor, 0);
+            const cashItem = payments.find((p) => p.method.toLowerCase().includes("cash"));
+            const cashAmount = cashItem ? cashItem.amount_minor : 0;
+            const digitalAmount = totalCollected - cashAmount;
+            const cashPct = totalCollected > 0 ? (cashAmount / totalCollected) * 100 : 0;
+            const digitalPct = totalCollected > 0 ? (digitalAmount / totalCollected) * 100 : 0;
+
+            const methodColors: Record<string, string> = {
+              "esewa": "bg-emerald-500",
+              "khalti": "bg-purple-500",
+              "card (pos)": "bg-sky-500",
+              "card": "bg-sky-500",
+              "cash": "bg-amber-500",
+            };
+
+            return (
+              <div className="space-y-3">
+                {/* Proportional Segmented Progress Bar */}
+                <div className="h-3 w-full rounded-full bg-muted/60 overflow-hidden flex shadow-inner p-0.5 gap-0.5">
+                  {payments.map((p, idx) => {
+                    const pct = totalCollected > 0 ? (p.amount_minor / totalCollected) * 100 : 0;
+                    const colorClass = methodColors[p.method.toLowerCase()] || "bg-primary";
+                    return (
+                      <div
+                        key={idx}
+                        style={{ width: `${pct}%` }}
+                        className={`h-full rounded-full transition-all duration-500 ${colorClass}`}
+                        title={`${p.method}: ${fmt(p.amount_minor / 100)} (${pct.toFixed(1)}%)`}
+                      />
+                    );
+                  })}
                 </div>
-                <div className="font-bold text-foreground">{fmt(p.amount_minor / 100)}</div>
+
+                {/* Cash Drawer vs Digital Quick Summary */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[11px] p-2.5 rounded-xl bg-sand-soft/40 border border-border">
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />
+                    <span>Physical Cash in Till: <strong className="text-foreground">{fmt(cashAmount / 100)}</strong> ({cashPct.toFixed(1)}%)</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-sky-500 shrink-0" />
+                    <span>Digital Bank Settlement: <strong className="text-foreground">{fmt(digitalAmount / 100)}</strong> ({digitalPct.toFixed(1)}%)</span>
+                  </div>
+                </div>
+
+                {/* Itemized Payments List */}
+                <div className="divide-y divide-border pt-1">
+                  {payments.map((p, idx) => {
+                    const pct = totalCollected > 0 ? (p.amount_minor / totalCollected) * 100 : 0;
+                    const dotColor = methodColors[p.method.toLowerCase()] || "bg-primary";
+                    return (
+                      <div key={idx} className="py-2.5 flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2.5">
+                          <span className={`h-2.5 w-2.5 rounded-full ${dotColor}`} />
+                          <Badge variant="outline" className="font-medium bg-background">{p.method}</Badge>
+                          <span className="text-[11px] text-muted-foreground font-medium">{pct.toFixed(1)}%</span>
+                        </div>
+                        <div className="font-bold text-foreground font-serif">{fmt(p.amount_minor / 100)}</div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            ))}
-          </div>
+            );
+          })()}
         </div>
 
         {/* Staff Commissions & Accrual */}

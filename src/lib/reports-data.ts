@@ -64,6 +64,13 @@ export interface StockMovementBreakdown {
   quantity_delta: number;
 }
 
+export interface HourlySalesBreakdown {
+  hour: string; // e.g. "10:00"
+  display_hour: string; // e.g. "10 AM"
+  sales_count: number;
+  gross_revenue_minor: number;
+}
+
 export interface DailySalesReportData {
   date: string;
   branch_id: string;
@@ -77,6 +84,7 @@ export interface DailySalesReportData {
   refunds: RefundBreakdown[];
   voids: any[];
   stock_movements: StockMovementBreakdown[];
+  hourly_sales: HourlySalesBreakdown[];
 }
 
 // ── Daily VAT Report Interfaces ─────────────────────────
@@ -189,6 +197,18 @@ export function getDailySalesReport(date = "2026-09-19", branchId = "Jhamsikhel"
       { product_id: "p2", product_name: "L'Oréal Pro Smoothing Cream", movement_type: "sale", quantity_delta: -2 },
       { product_id: "p3", product_name: "Dermalogica Daily Microfoliant", movement_type: "sale", quantity_delta: -2 },
       { product_id: "i1", product_name: "L'Oréal Majirel Color Tubes", movement_type: "restock", quantity_delta: 12 },
+    ],
+    hourly_sales: [
+      { hour: "10:00", display_hour: "10 AM", sales_count: 2, gross_revenue_minor: 850000 },
+      { hour: "11:00", display_hour: "11 AM", sales_count: 3, gross_revenue_minor: 1400000 },
+      { hour: "12:00", display_hour: "12 PM", sales_count: 2, gross_revenue_minor: 1100000 },
+      { hour: "13:00", display_hour: "1 PM",  sales_count: 1, gross_revenue_minor: 700000 },
+      { hour: "14:00", display_hour: "2 PM",  sales_count: 3, gross_revenue_minor: 1650000 },
+      { hour: "15:00", display_hour: "3 PM",  sales_count: 2, gross_revenue_minor: 1200000 },
+      { hour: "16:00", display_hour: "4 PM",  sales_count: 3, gross_revenue_minor: 1850000 },
+      { hour: "17:00", display_hour: "5 PM",  sales_count: 4, gross_revenue_minor: 2600000 }, // Peak
+      { hour: "18:00", display_hour: "6 PM",  sales_count: 3, gross_revenue_minor: 2100000 },
+      { hour: "19:00", display_hour: "7 PM",  sales_count: 1, gross_revenue_minor: 800000 },
     ],
   };
 }
