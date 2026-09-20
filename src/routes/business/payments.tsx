@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+﻿import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -14,11 +14,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/business/payments")({
-  head: () => ({ meta: [{ title: "Payments · BRG Suite" }] }),
+  head: () => ({ meta: [{ title: "Payments Â· BRG Suite" }] }),
   component: PaymentsPage,
 });
 
-function PaymentsPage() {
+export function PaymentsPage() {
   const [q, setQ] = useState("");
   const [method, setMethod] = useState<"All" | PayMethod>("All");
 
@@ -99,7 +99,7 @@ function PaymentsPage() {
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Search by customer, reference, payment ID…"
+                placeholder="Search by customer, reference, payment IDâ€¦"
                 className="w-full h-11 pl-10 pr-4 rounded-xl border border-border bg-card text-sm focus:outline-none focus:ring-2 focus:ring-ring/40"
               />
             </div>
@@ -130,7 +130,7 @@ function PaymentsPage() {
                     <th className="text-left px-4 py-3">Amount</th>
                     <th className="text-left px-4 py-3">Method</th>
                     <th className="text-left px-4 py-3">Status</th>
-                    <th className="text-left px-4 py-3">Branch · Staff</th>
+                    <th className="text-left px-4 py-3">Branch Â· Staff</th>
                     <th className="text-left px-4 py-3">Settlement</th>
                     <th className="px-4 py-3"></th>
                   </tr>
@@ -214,7 +214,7 @@ function PaymentsPage() {
                     <td className="px-4 py-3 text-xs">{s.date}</td>
                     <td className="px-4 py-3">{s.marketplaceBookings}</td>
                     <td className="px-4 py-3">{fmt(s.gross)}</td>
-                    <td className="px-4 py-3 text-rose">−{fmt(s.brgCommission)}</td>
+                    <td className="px-4 py-3 text-rose">âˆ’{fmt(s.brgCommission)}</td>
                     <td className="px-4 py-3 font-medium">{fmt(s.businessEarning)}</td>
                     <td className="px-4 py-3">
                       <span className={cn(
@@ -236,3 +236,4 @@ function PaymentsPage() {
     </div>
   );
 }
+

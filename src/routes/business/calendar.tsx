@@ -13,7 +13,7 @@ import {
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/business/calendar")({
-  head: () => ({ meta: [{ title: "Calendar · BRG Suite" }] }),
+  head: () => ({ meta: [{ title: "Calendar Â· BRG Suite" }] }),
   component: CalendarPage,
 });
 
@@ -22,16 +22,30 @@ const VIEWS: View[] = ["Day", "Week", "Month", "Staff", "Rooms"];
 
 const HOURS = Array.from({ length: 11 }, (_, i) => 9 + i); // 9..19
 
-function CalendarPage() {
-  const [view, setView] = useState<View>("Day");
+export function CalendarPage({
+  defaultStaff,
+  lockStaff = false,
+  defaultView = "Day",
+  customTitle,
+  customEyebrow,
+}: {
+  defaultStaff?: string;
+  lockStaff?: boolean;
+  defaultView?: View;
+  customTitle?: string;
+  customEyebrow?: string;
+} = {}) {
+  const [view, setView] = useState<View>(defaultView);
   const [dayOffset, setDayOffset] = useState(0);
   const [open, setOpen] = useState<Booking | null>(null);
   const [modal, setModal] = useState(false);
   const [branch, setBranch] = useState("All");
-  const [staff, setStaff] = useState("All");
+  const [staff, setStaff] = useState(defaultStaff || "All");
   const [cat, setCat] = useState("All");
   const [status, setStatus] = useState("All");
   const [pay, setPay] = useState("All");
+
+  const viewsToUse = lockStaff ? (["Day", "Week", "Month"] as View[]) : VIEWS;
 
   const dateIso = addDaysIso(dayOffset);
   const dateLabel = new Date(dateIso).toLocaleDateString("en-US", {
@@ -51,18 +65,18 @@ function CalendarPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Schedule"
-        title="Calendar"
-        description="Plan, reschedule and confirm appointments across all six branches."
+        eyebrow={customEyebrow || (lockStaff ? "Station Schedule" : "Schedule")}
+        title={customTitle || (lockStaff ? `${staff !== "All" ? staff : "My"} Schedule` : "Calendar")}
+        description={lockStaff ? "Your personalized station appointments and daily time slots." : "Plan, reschedule and confirm appointments across all six branches."}
         actions={
           <div className="flex flex-wrap gap-2">
             <button onClick={() => setModal(true)} className="inline-flex items-center gap-2 rounded-xl bg-primary text-primary-foreground px-3.5 py-2.5 text-sm font-medium shadow-luxe">
               <Plus className="h-4 w-4" />Add Booking
             </button>
-            <button className="inline-flex items-center gap-2 rounded-xl bg-card border border-border px-3.5 py-2.5 text-sm font-medium hover:bg-muted">
+            <button onClick={() => window.dispatchEvent(new CustomEvent("open-new-booking"))} className="inline-flex items-center gap-2 rounded-xl bg-card border border-border px-3.5 py-2.5 text-sm font-medium hover:bg-muted">
               <UserPlus className="h-4 w-4" />Walk-in
             </button>
-            <button className="inline-flex items-center gap-2 rounded-xl bg-card border border-border px-3.5 py-2.5 text-sm font-medium hover:bg-muted">
+            <button onClick={() => window.dispatchEvent(new CustomEvent("toggle-staff-break"))} className="inline-flex items-center gap-2 rounded-xl bg-card border border-border px-3.5 py-2.5 text-sm font-medium hover:bg-muted">
               <Ban className="h-4 w-4" />Block Time
             </button>
           </div>
@@ -72,20 +86,28 @@ function CalendarPage() {
       {/* View switcher + nav */}
       <div className="flex flex-col xl:flex-row xl:items-center gap-3 mb-5">
         <div className="inline-flex rounded-xl bg-card border border-border p-1 self-start">
-          {VIEWS.map((v) => (
-            <button key={v} onClick={() => setView(v)}
-              className={cn("px-3.5 py-1.5 text-sm rounded-lg transition",
-                view === v ? "bg-primary text-primary-foreground shadow-luxe" : "text-muted-foreground hover:text-foreground")}>
+          {viewsToUse.map((v) => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              className={cn(
+                "rounded-lg px-3.5 py-1.5 text-xs font-medium transition",
+                view === v ? "bg-primary text-primary-foreground shadow-luxe" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
               {v}
             </button>
           ))}
         </div>
+
         <div className="flex items-center gap-2">
-          <button onClick={() => setDayOffset((d) => d - 1)} className="h-9 w-9 grid place-items-center rounded-xl border border-border bg-card hover:bg-muted">
+          <button onClick={() => setDayOffset(0)} className="rounded-xl border border-border bg-card px-3 py-1.5 text-xs font-medium hover:bg-muted">
+            Today
+          </button>
+          <button onClick={() => setDayOffset((d) => d - 1)} className="h-8 w-8 rounded-xl border border-border bg-card grid place-items-center hover:bg-muted">
             <ChevronLeft className="h-4 w-4" />
           </button>
-          <button onClick={() => setDayOffset(0)} className="h-9 px-3 rounded-xl border border-border bg-card text-sm hover:bg-muted">Today</button>
-          <button onClick={() => setDayOffset((d) => d + 1)} className="h-9 w-9 grid place-items-center rounded-xl border border-border bg-card hover:bg-muted">
+          <button onClick={() => setDayOffset((d) => d + 1)} className="h-8 w-8 rounded-xl border border-border bg-card grid place-items-center hover:bg-muted">
             <ChevronRight className="h-4 w-4" />
           </button>
           <div className="ml-2 font-serif text-xl">{dateLabel}</div>
@@ -95,8 +117,14 @@ function CalendarPage() {
       {/* Filters */}
       <div className="rounded-2xl bg-card border border-border p-4 mb-5 flex flex-wrap items-center gap-2">
         <div className="inline-flex items-center gap-1.5 text-xs text-muted-foreground mr-1"><Filter className="h-3.5 w-3.5" />Filters</div>
-        <FilterSelect label="Branch" value={branch} onChange={setBranch} options={["All", ...BRANCHES]} />
-        <FilterSelect label="Staff" value={staff} onChange={setStaff} options={["All", ...STAFF]} />
+        {!lockStaff && <FilterSelect label="Branch" value={branch} onChange={setBranch} options={["All", ...BRANCHES]} />}
+        {lockStaff ? (
+          <div className="inline-flex items-center gap-1.5 rounded-xl border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs text-primary font-medium">
+            Stylist: {staff}
+          </div>
+        ) : (
+          <FilterSelect label="Staff" value={staff} onChange={setStaff} options={["All", ...STAFF]} />
+        )}
         <FilterSelect label="Category" value={cat} onChange={setCat} options={["All", ...CATEGORIES]} />
         <FilterSelect label="Status" value={status} onChange={setStatus} options={["All", ...STATUSES]} />
         <FilterSelect label="Payment" value={pay} onChange={setPay} options={["All", ...PAY_STATUSES]} />
@@ -144,7 +172,7 @@ function AppointmentCard({ b, onOpen, compact }: { b: Booking; onOpen: (b: Booki
         <div className="w-1.5 shrink-0" style={{ background: tone.bar }} />
         <div className={cn("flex-1 min-w-0 p-2.5", compact && "p-2")}>
           <div className="flex items-center justify-between gap-2">
-            <div className="text-[11px] text-deep-olive font-medium">{b.start} · {b.duration}m</div>
+            <div className="text-[11px] text-deep-olive font-medium">{b.start} Â· {b.duration}m</div>
             <span className={`inline-flex items-center text-[10px] rounded-full border px-1.5 py-0.5 ${statusTone(b.status)}`}>{b.status}</span>
           </div>
           <div className="font-serif text-sm leading-tight mt-1 truncate">{b.customer}</div>
@@ -179,7 +207,7 @@ function DayGrid({ bookings, onOpen }: { bookings: Booking[]; onOpen: (b: Bookin
           ))}
           {bookings.length === 0 && (
             <div className="absolute inset-0 grid place-items-center text-sm text-muted-foreground">
-              No appointments — enjoy the calm.
+              No appointments â€” enjoy the calm.
             </div>
           )}
           {bookings.map((b) => {
@@ -221,7 +249,7 @@ function WeekGrid({ offset, filtered, onOpen }: { offset: number; filtered: Book
           const items = filtered.filter((b) => b.date === iso);
           return (
             <div key={+d} className="border-r last:border-r-0 border-border p-2 space-y-2">
-              {items.length === 0 && <div className="text-[11px] text-muted-foreground/60 p-2">—</div>}
+              {items.length === 0 && <div className="text-[11px] text-muted-foreground/60 p-2">â€”</div>}
               {items.map((b) => <AppointmentCard key={b.id} b={b} onOpen={onOpen} compact />)}
             </div>
           );
@@ -309,7 +337,7 @@ function ResourceGrid({
                     </div>
                   );
                 })}
-                {items.length === 0 && <div className="absolute inset-x-0 top-3 text-center text-[11px] text-muted-foreground/60">—</div>}
+                {items.length === 0 && <div className="absolute inset-x-0 top-3 text-center text-[11px] text-muted-foreground/60">â€”</div>}
               </div>
             );
           })}
@@ -318,3 +346,4 @@ function ResourceGrid({
     </div>
   );
 }
+

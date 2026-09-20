@@ -39,6 +39,8 @@ export type Product = {
   stock: number;
   threshold: number;
   supplier: string;
+  supplierId?: string;
+  unitType?: string; // "Bottle" | "Box" | "Piece" | "Tube" | "Carton" | "Packet" | "Pack" | "Can"
   costPrice: number;
   sellingPrice: number;
   expiry: string;
@@ -47,16 +49,16 @@ export type Product = {
 };
 
 export const PRODUCTS: Product[] = [
-  { id: "i1", name: "L'Oréal Majirel 7.43", category: "Hair", sku: "LOR-MAJ-743", stock: 4, threshold: 6, supplier: "L'Oréal Nepal", costPrice: 1200, sellingPrice: 0, expiry: "2027-02", usedIn: ["Balayage", "Color Touch-up"], retail: false },
-  { id: "i2", name: "Olaplex No.3 Treatment", category: "Hair", sku: "OLP-N3-100", stock: 18, threshold: 10, supplier: "Beauty Plus", costPrice: 2800, sellingPrice: 4200, expiry: "2027-08", usedIn: ["Keratin", "Hair Spa"], retail: true },
-  { id: "i3", name: "OPI Gel Polish · Bubble Bath", category: "Nail", sku: "OPI-GEL-BB", stock: 2, threshold: 5, supplier: "Nail Pro Imports", costPrice: 1500, sellingPrice: 2400, expiry: "2027-05", usedIn: ["Gel Manicure", "Gel Extensions"], retail: true },
-  { id: "i4", name: "Dermalogica HydraSerum", category: "Skin", sku: "DER-HYD-30", stock: 9, threshold: 5, supplier: "SkinLab Nepal", costPrice: 4500, sellingPrice: 6800, expiry: "2026-09", usedIn: ["HydraFacial Premium"], retail: true },
-  { id: "i5", name: "MAC Studio Fix Foundation", category: "Makeup", sku: "MAC-SF-NW20", stock: 6, threshold: 4, supplier: "MAC Cosmetics", costPrice: 3800, sellingPrice: 5400, expiry: "2027-12", usedIn: ["Bridal Makeup", "HD Makeup"], retail: true },
-  { id: "i6", name: "Forest Essentials Oil Blend", category: "Spa", sku: "FE-OIL-200", stock: 12, threshold: 6, supplier: "Forest Essentials", costPrice: 2200, sellingPrice: 3500, expiry: "2026-11", usedIn: ["Ayurvedic Massage", "Wellness Detox"], retail: true },
-  { id: "i7", name: "Colgate Whitening Gel Kit", category: "Dental", sku: "COL-WG-KIT", stock: 3, threshold: 4, supplier: "Colgate Nepal", costPrice: 4200, sellingPrice: 6500, expiry: "2026-07", usedIn: ["Teeth Whitening"], retail: true },
-  { id: "i8", name: "Disposable Towels (50pk)", category: "Consumables", sku: "CON-TOW-50", stock: 24, threshold: 10, supplier: "Salon Supplies KTM", costPrice: 800, sellingPrice: 0, expiry: "—", usedIn: ["All services"], retail: false },
-  { id: "i9", name: "Cotton Pads (Bulk)", category: "Consumables", sku: "CON-COT-BLK", stock: 1, threshold: 8, supplier: "Salon Supplies KTM", costPrice: 450, sellingPrice: 0, expiry: "—", usedIn: ["Skin services"], retail: false },
-  { id: "i10", name: "L'Oréal Smoothing Cream", category: "Hair", sku: "LOR-SMTH-200", stock: 7, threshold: 5, supplier: "L'Oréal Nepal", costPrice: 1900, sellingPrice: 2900, expiry: "2026-06", usedIn: ["Keratin Smoothing"], retail: true },
+  { id: "i1", name: "L'Oréal Majirel 7.43", category: "Hair", sku: "LOR-MAJ-743", stock: 4, threshold: 6, supplier: "L'Oréal Nepal", supplierId: "sup-1", unitType: "Tube", costPrice: 1200, sellingPrice: 0, expiry: "2027-02", usedIn: ["Balayage", "Color Touch-up"], retail: false },
+  { id: "i2", name: "Olaplex No.3 Treatment", category: "Hair", sku: "OLP-N3-100", stock: 18, threshold: 10, supplier: "Beauty Plus", supplierId: "sup-2", unitType: "Bottle", costPrice: 2800, sellingPrice: 4200, expiry: "2027-08", usedIn: ["Keratin", "Hair Spa"], retail: true },
+  { id: "i3", name: "OPI Gel Polish · Bubble Bath", category: "Nail", sku: "OPI-GEL-BB", stock: 2, threshold: 5, supplier: "Nail Pro Imports", supplierId: "sup-3", unitType: "Bottle", costPrice: 1500, sellingPrice: 2400, expiry: "2027-05", usedIn: ["Gel Manicure", "Gel Extensions"], retail: true },
+  { id: "i4", name: "Dermalogica HydraSerum", category: "Skin", sku: "DER-HYD-30", stock: 9, threshold: 5, supplier: "SkinLab Nepal", supplierId: "sup-4", unitType: "Bottle", costPrice: 4500, sellingPrice: 6800, expiry: "2026-09", usedIn: ["HydraFacial Premium"], retail: true },
+  { id: "i5", name: "MAC Studio Fix Foundation", category: "Makeup", sku: "MAC-SF-NW20", stock: 6, threshold: 4, supplier: "MAC Cosmetics", supplierId: "sup-5", unitType: "Bottle", costPrice: 3800, sellingPrice: 5400, expiry: "2027-12", usedIn: ["Bridal Makeup", "HD Makeup"], retail: true },
+  { id: "i6", name: "Forest Essentials Oil Blend", category: "Spa", sku: "FE-OIL-200", stock: 12, threshold: 6, supplier: "Forest Essentials", supplierId: "sup-6", unitType: "Bottle", costPrice: 2200, sellingPrice: 3500, expiry: "2026-11", usedIn: ["Ayurvedic Massage", "Wellness Detox"], retail: true },
+  { id: "i7", name: "Colgate Whitening Gel Kit", category: "Dental", sku: "COL-WG-KIT", stock: 3, threshold: 4, supplier: "Colgate Nepal", supplierId: "sup-7", unitType: "Box", costPrice: 4200, sellingPrice: 6500, expiry: "2026-07", usedIn: ["Teeth Whitening"], retail: true },
+  { id: "i8", name: "Disposable Towels (50pk)", category: "Consumables", sku: "CON-TOW-50", stock: 24, threshold: 10, supplier: "Salon Supplies KTM", supplierId: "sup-8", unitType: "Pack", costPrice: 800, sellingPrice: 0, expiry: "—", usedIn: ["All services"], retail: false },
+  { id: "i9", name: "Cotton Pads (Bulk)", category: "Consumables", sku: "CON-COT-BLK", stock: 1, threshold: 8, supplier: "Salon Supplies KTM", supplierId: "sup-8", unitType: "Pack", costPrice: 450, sellingPrice: 0, expiry: "—", usedIn: ["Skin services"], retail: false },
+  { id: "i10", name: "L'Oréal Smoothing Cream", category: "Hair", sku: "LOR-SMTH-200", stock: 7, threshold: 5, supplier: "L'Oréal Nepal", supplierId: "sup-1", unitType: "Bottle", costPrice: 1900, sellingPrice: 2900, expiry: "2026-06", usedIn: ["Keratin Smoothing"], retail: true },
 ];
 
 export const SETTLEMENTS = [

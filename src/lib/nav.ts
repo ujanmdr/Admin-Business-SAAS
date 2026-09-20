@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Calendar, BookOpen, Users, UserCog, Sparkles, Package, BadgeCheck,
   Gift, Heart, CreditCard, ShoppingBag, Boxes, Tag, Film, Star, Megaphone, GraduationCap,
-  BarChart3, Settings, Handshake, Receipt, LifeBuoy
+  BarChart3, Settings, Handshake, Receipt, LifeBuoy, ShoppingCart, Truck
 } from "lucide-react";
 
 export type NavItem = { label: string; to: string; icon: any; group: string };
@@ -23,6 +23,8 @@ export const navItems: NavItem[] = [
   { label: "Payments", to: "/business/payments", icon: CreditCard, group: "Finance" },
   { label: "POS", to: "/business/pos", icon: ShoppingBag, group: "Finance" },
   { label: "Inventory", to: "/business/inventory", icon: Boxes, group: "Finance" },
+  { label: "Purchases", to: "/business/purchases", icon: ShoppingCart, group: "Finance" },
+  { label: "Suppliers", to: "/business/suppliers", icon: Truck, group: "Finance" },
   { label: "Expenses", to: "/business/expenses", icon: Receipt, group: "Finance" },
 
   { label: "Offers", to: "/business/offers", icon: Tag, group: "Growth" },
@@ -40,3 +42,26 @@ export const navItems: NavItem[] = [
 
 export const branches = ["Jhamsikhel", "Lazimpat", "Baneshwor", "Patan", "Thamel", "Pokhara"];
 export const businesses = ["Aura Beauty Lounge", "Aura Wellness Spa", "Aura Academy"];
+
+export const receptionistNavItems: NavItem[] = [
+  { label: "Front Desk", to: "/staff", icon: LayoutDashboard, group: "Daily" },
+  { label: "Calendar", to: "/staff/calendar", icon: Calendar, group: "Daily" },
+  { label: "POS Billing", to: "/staff/pos", icon: ShoppingBag, group: "Daily" },
+  { label: "Bookings", to: "/staff/bookings", icon: BookOpen, group: "Daily" },
+  { label: "Customers", to: "/staff/customers", icon: Users, group: "Front Office" },
+  { label: "Payments", to: "/staff/payments", icon: CreditCard, group: "Front Office" },
+  { label: "Purchases", to: "/business/purchases", icon: ShoppingCart, group: "Front Office" },
+  { label: "Suppliers", to: "/business/suppliers", icon: Truck, group: "Front Office" },
+  { label: "Expenses", to: "/staff/expenses", icon: Receipt, group: "Front Office" },
+  { label: "Support", to: "/staff/support", icon: LifeBuoy, group: "Help" },
+];
+
+export const providerNavItems: NavItem[] = [
+  { label: "My Chair", to: "/staff", icon: LayoutDashboard, group: "My Work" },
+  { label: "My Schedule", to: "/staff/calendar", icon: Calendar, group: "My Work" },
+  { label: "My Clients", to: "/staff/customers", icon: Users, group: "My Work" },
+  { label: "Support", to: "/staff/support", icon: LifeBuoy, group: "Help" },
+];
+
+export const staffNavItems: NavItem[] = receptionistNavItems;
+

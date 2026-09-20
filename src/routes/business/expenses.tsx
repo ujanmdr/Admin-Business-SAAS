@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+﻿import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { NewExpenseModal } from "@/components/NewExpenseModal";
 
 export const Route = createFileRoute("/business/expenses")({
-  head: () => ({ meta: [{ title: "Expenses · BRG Suite" }] }),
+  head: () => ({ meta: [{ title: "Expenses Â· BRG Suite" }] }),
   component: ExpensesPage,
 });
 
@@ -38,7 +38,7 @@ function fmt(amount: number) {
   return new Intl.NumberFormat("en-NP", { style: "currency", currency: "NPR" }).format(amount);
 }
 
-function ExpensesPage() {
+export function ExpensesPage() {
   const [q, setQ] = useState("");
   const [expenses, setExpenses] = useState(INITIAL_EXPENSE_DATA);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -208,3 +208,4 @@ function ExpensesPage() {
     </div>
   );
 }
+

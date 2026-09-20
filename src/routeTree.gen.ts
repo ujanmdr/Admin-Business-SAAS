@@ -9,12 +9,22 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as StaffRouteImport } from './routes/staff'
 import { Route as BusinessRouteImport } from './routes/business'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as StaffIndexRouteImport } from './routes/staff/index'
 import { Route as BusinessIndexRouteImport } from './routes/business/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as StaffSupportRouteImport } from './routes/staff/support'
+import { Route as StaffPosRouteImport } from './routes/staff/pos'
+import { Route as StaffPaymentsRouteImport } from './routes/staff/payments'
+import { Route as StaffExpensesRouteImport } from './routes/staff/expenses'
+import { Route as StaffCustomersRouteImport } from './routes/staff/customers'
+import { Route as StaffCalendarRouteImport } from './routes/staff/calendar'
+import { Route as StaffBookingsRouteImport } from './routes/staff/bookings'
 import { Route as BusinessSupportRouteImport } from './routes/business/support'
+import { Route as BusinessSuppliersRouteImport } from './routes/business/suppliers'
 import { Route as BusinessSubscriptionsRouteImport } from './routes/business/subscriptions'
 import { Route as BusinessStaffRouteImport } from './routes/business/staff'
 import { Route as BusinessSettingsRouteImport } from './routes/business/settings'
@@ -22,6 +32,7 @@ import { Route as BusinessServicesRouteImport } from './routes/business/services
 import { Route as BusinessReviewsRouteImport } from './routes/business/reviews'
 import { Route as BusinessReportsRouteImport } from './routes/business/reports'
 import { Route as BusinessReelsRouteImport } from './routes/business/reels'
+import { Route as BusinessPurchasesRouteImport } from './routes/business/purchases'
 import { Route as BusinessPosRouteImport } from './routes/business/pos'
 import { Route as BusinessPaymentsRouteImport } from './routes/business/payments'
 import { Route as BusinessPartnersRouteImport } from './routes/business/partners'
@@ -59,6 +70,11 @@ import { Route as AdminApprovalsRouteImport } from './routes/admin/approvals'
 import { Route as AdminAdminsRouteImport } from './routes/admin/admins'
 import { Route as AdminActivityRouteImport } from './routes/admin/activity'
 
+const StaffRoute = StaffRouteImport.update({
+  id: '/staff',
+  path: '/staff',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BusinessRoute = BusinessRouteImport.update({
   id: '/business',
   path: '/business',
@@ -74,6 +90,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StaffIndexRoute = StaffIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => StaffRoute,
+} as any)
 const BusinessIndexRoute = BusinessIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -84,9 +105,49 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AdminRoute,
 } as any)
+const StaffSupportRoute = StaffSupportRouteImport.update({
+  id: '/support',
+  path: '/support',
+  getParentRoute: () => StaffRoute,
+} as any)
+const StaffPosRoute = StaffPosRouteImport.update({
+  id: '/pos',
+  path: '/pos',
+  getParentRoute: () => StaffRoute,
+} as any)
+const StaffPaymentsRoute = StaffPaymentsRouteImport.update({
+  id: '/payments',
+  path: '/payments',
+  getParentRoute: () => StaffRoute,
+} as any)
+const StaffExpensesRoute = StaffExpensesRouteImport.update({
+  id: '/expenses',
+  path: '/expenses',
+  getParentRoute: () => StaffRoute,
+} as any)
+const StaffCustomersRoute = StaffCustomersRouteImport.update({
+  id: '/customers',
+  path: '/customers',
+  getParentRoute: () => StaffRoute,
+} as any)
+const StaffCalendarRoute = StaffCalendarRouteImport.update({
+  id: '/calendar',
+  path: '/calendar',
+  getParentRoute: () => StaffRoute,
+} as any)
+const StaffBookingsRoute = StaffBookingsRouteImport.update({
+  id: '/bookings',
+  path: '/bookings',
+  getParentRoute: () => StaffRoute,
+} as any)
 const BusinessSupportRoute = BusinessSupportRouteImport.update({
   id: '/support',
   path: '/support',
+  getParentRoute: () => BusinessRoute,
+} as any)
+const BusinessSuppliersRoute = BusinessSuppliersRouteImport.update({
+  id: '/suppliers',
+  path: '/suppliers',
   getParentRoute: () => BusinessRoute,
 } as any)
 const BusinessSubscriptionsRoute = BusinessSubscriptionsRouteImport.update({
@@ -122,6 +183,11 @@ const BusinessReportsRoute = BusinessReportsRouteImport.update({
 const BusinessReelsRoute = BusinessReelsRouteImport.update({
   id: '/reels',
   path: '/reels',
+  getParentRoute: () => BusinessRoute,
+} as any)
+const BusinessPurchasesRoute = BusinessPurchasesRouteImport.update({
+  id: '/purchases',
+  path: '/purchases',
   getParentRoute: () => BusinessRoute,
 } as any)
 const BusinessPosRoute = BusinessPosRouteImport.update({
@@ -309,6 +375,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/business': typeof BusinessRouteWithChildren
+  '/staff': typeof StaffRouteWithChildren
   '/admin/activity': typeof AdminActivityRoute
   '/admin/admins': typeof AdminAdminsRoute
   '/admin/approvals': typeof AdminApprovalsRoute
@@ -345,6 +412,7 @@ export interface FileRoutesByFullPath {
   '/business/partners': typeof BusinessPartnersRoute
   '/business/payments': typeof BusinessPaymentsRoute
   '/business/pos': typeof BusinessPosRoute
+  '/business/purchases': typeof BusinessPurchasesRoute
   '/business/reels': typeof BusinessReelsRoute
   '/business/reports': typeof BusinessReportsRoute
   '/business/reviews': typeof BusinessReviewsRoute
@@ -352,9 +420,18 @@ export interface FileRoutesByFullPath {
   '/business/settings': typeof BusinessSettingsRoute
   '/business/staff': typeof BusinessStaffRoute
   '/business/subscriptions': typeof BusinessSubscriptionsRoute
+  '/business/suppliers': typeof BusinessSuppliersRoute
   '/business/support': typeof BusinessSupportRoute
+  '/staff/bookings': typeof StaffBookingsRoute
+  '/staff/calendar': typeof StaffCalendarRoute
+  '/staff/customers': typeof StaffCustomersRoute
+  '/staff/expenses': typeof StaffExpensesRoute
+  '/staff/payments': typeof StaffPaymentsRoute
+  '/staff/pos': typeof StaffPosRoute
+  '/staff/support': typeof StaffSupportRoute
   '/admin/': typeof AdminIndexRoute
   '/business/': typeof BusinessIndexRoute
+  '/staff/': typeof StaffIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -394,6 +471,7 @@ export interface FileRoutesByTo {
   '/business/partners': typeof BusinessPartnersRoute
   '/business/payments': typeof BusinessPaymentsRoute
   '/business/pos': typeof BusinessPosRoute
+  '/business/purchases': typeof BusinessPurchasesRoute
   '/business/reels': typeof BusinessReelsRoute
   '/business/reports': typeof BusinessReportsRoute
   '/business/reviews': typeof BusinessReviewsRoute
@@ -401,15 +479,25 @@ export interface FileRoutesByTo {
   '/business/settings': typeof BusinessSettingsRoute
   '/business/staff': typeof BusinessStaffRoute
   '/business/subscriptions': typeof BusinessSubscriptionsRoute
+  '/business/suppliers': typeof BusinessSuppliersRoute
   '/business/support': typeof BusinessSupportRoute
+  '/staff/bookings': typeof StaffBookingsRoute
+  '/staff/calendar': typeof StaffCalendarRoute
+  '/staff/customers': typeof StaffCustomersRoute
+  '/staff/expenses': typeof StaffExpensesRoute
+  '/staff/payments': typeof StaffPaymentsRoute
+  '/staff/pos': typeof StaffPosRoute
+  '/staff/support': typeof StaffSupportRoute
   '/admin': typeof AdminIndexRoute
   '/business': typeof BusinessIndexRoute
+  '/staff': typeof StaffIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/business': typeof BusinessRouteWithChildren
+  '/staff': typeof StaffRouteWithChildren
   '/admin/activity': typeof AdminActivityRoute
   '/admin/admins': typeof AdminAdminsRoute
   '/admin/approvals': typeof AdminApprovalsRoute
@@ -446,6 +534,7 @@ export interface FileRoutesById {
   '/business/partners': typeof BusinessPartnersRoute
   '/business/payments': typeof BusinessPaymentsRoute
   '/business/pos': typeof BusinessPosRoute
+  '/business/purchases': typeof BusinessPurchasesRoute
   '/business/reels': typeof BusinessReelsRoute
   '/business/reports': typeof BusinessReportsRoute
   '/business/reviews': typeof BusinessReviewsRoute
@@ -453,9 +542,18 @@ export interface FileRoutesById {
   '/business/settings': typeof BusinessSettingsRoute
   '/business/staff': typeof BusinessStaffRoute
   '/business/subscriptions': typeof BusinessSubscriptionsRoute
+  '/business/suppliers': typeof BusinessSuppliersRoute
   '/business/support': typeof BusinessSupportRoute
+  '/staff/bookings': typeof StaffBookingsRoute
+  '/staff/calendar': typeof StaffCalendarRoute
+  '/staff/customers': typeof StaffCustomersRoute
+  '/staff/expenses': typeof StaffExpensesRoute
+  '/staff/payments': typeof StaffPaymentsRoute
+  '/staff/pos': typeof StaffPosRoute
+  '/staff/support': typeof StaffSupportRoute
   '/admin/': typeof AdminIndexRoute
   '/business/': typeof BusinessIndexRoute
+  '/staff/': typeof StaffIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -463,6 +561,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/business'
+    | '/staff'
     | '/admin/activity'
     | '/admin/admins'
     | '/admin/approvals'
@@ -499,6 +598,7 @@ export interface FileRouteTypes {
     | '/business/partners'
     | '/business/payments'
     | '/business/pos'
+    | '/business/purchases'
     | '/business/reels'
     | '/business/reports'
     | '/business/reviews'
@@ -506,9 +606,18 @@ export interface FileRouteTypes {
     | '/business/settings'
     | '/business/staff'
     | '/business/subscriptions'
+    | '/business/suppliers'
     | '/business/support'
+    | '/staff/bookings'
+    | '/staff/calendar'
+    | '/staff/customers'
+    | '/staff/expenses'
+    | '/staff/payments'
+    | '/staff/pos'
+    | '/staff/support'
     | '/admin/'
     | '/business/'
+    | '/staff/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -548,6 +657,7 @@ export interface FileRouteTypes {
     | '/business/partners'
     | '/business/payments'
     | '/business/pos'
+    | '/business/purchases'
     | '/business/reels'
     | '/business/reports'
     | '/business/reviews'
@@ -555,14 +665,24 @@ export interface FileRouteTypes {
     | '/business/settings'
     | '/business/staff'
     | '/business/subscriptions'
+    | '/business/suppliers'
     | '/business/support'
+    | '/staff/bookings'
+    | '/staff/calendar'
+    | '/staff/customers'
+    | '/staff/expenses'
+    | '/staff/payments'
+    | '/staff/pos'
+    | '/staff/support'
     | '/admin'
     | '/business'
+    | '/staff'
   id:
     | '__root__'
     | '/'
     | '/admin'
     | '/business'
+    | '/staff'
     | '/admin/activity'
     | '/admin/admins'
     | '/admin/approvals'
@@ -599,6 +719,7 @@ export interface FileRouteTypes {
     | '/business/partners'
     | '/business/payments'
     | '/business/pos'
+    | '/business/purchases'
     | '/business/reels'
     | '/business/reports'
     | '/business/reviews'
@@ -606,19 +727,36 @@ export interface FileRouteTypes {
     | '/business/settings'
     | '/business/staff'
     | '/business/subscriptions'
+    | '/business/suppliers'
     | '/business/support'
+    | '/staff/bookings'
+    | '/staff/calendar'
+    | '/staff/customers'
+    | '/staff/expenses'
+    | '/staff/payments'
+    | '/staff/pos'
+    | '/staff/support'
     | '/admin/'
     | '/business/'
+    | '/staff/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
   BusinessRoute: typeof BusinessRouteWithChildren
+  StaffRoute: typeof StaffRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/staff': {
+      id: '/staff'
+      path: '/staff'
+      fullPath: '/staff'
+      preLoaderRoute: typeof StaffRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/business': {
       id: '/business'
       path: '/business'
@@ -640,6 +778,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/staff/': {
+      id: '/staff/'
+      path: '/'
+      fullPath: '/staff/'
+      preLoaderRoute: typeof StaffIndexRouteImport
+      parentRoute: typeof StaffRoute
+    }
     '/business/': {
       id: '/business/'
       path: '/'
@@ -654,11 +799,67 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/staff/support': {
+      id: '/staff/support'
+      path: '/support'
+      fullPath: '/staff/support'
+      preLoaderRoute: typeof StaffSupportRouteImport
+      parentRoute: typeof StaffRoute
+    }
+    '/staff/pos': {
+      id: '/staff/pos'
+      path: '/pos'
+      fullPath: '/staff/pos'
+      preLoaderRoute: typeof StaffPosRouteImport
+      parentRoute: typeof StaffRoute
+    }
+    '/staff/payments': {
+      id: '/staff/payments'
+      path: '/payments'
+      fullPath: '/staff/payments'
+      preLoaderRoute: typeof StaffPaymentsRouteImport
+      parentRoute: typeof StaffRoute
+    }
+    '/staff/expenses': {
+      id: '/staff/expenses'
+      path: '/expenses'
+      fullPath: '/staff/expenses'
+      preLoaderRoute: typeof StaffExpensesRouteImport
+      parentRoute: typeof StaffRoute
+    }
+    '/staff/customers': {
+      id: '/staff/customers'
+      path: '/customers'
+      fullPath: '/staff/customers'
+      preLoaderRoute: typeof StaffCustomersRouteImport
+      parentRoute: typeof StaffRoute
+    }
+    '/staff/calendar': {
+      id: '/staff/calendar'
+      path: '/calendar'
+      fullPath: '/staff/calendar'
+      preLoaderRoute: typeof StaffCalendarRouteImport
+      parentRoute: typeof StaffRoute
+    }
+    '/staff/bookings': {
+      id: '/staff/bookings'
+      path: '/bookings'
+      fullPath: '/staff/bookings'
+      preLoaderRoute: typeof StaffBookingsRouteImport
+      parentRoute: typeof StaffRoute
+    }
     '/business/support': {
       id: '/business/support'
       path: '/support'
       fullPath: '/business/support'
       preLoaderRoute: typeof BusinessSupportRouteImport
+      parentRoute: typeof BusinessRoute
+    }
+    '/business/suppliers': {
+      id: '/business/suppliers'
+      path: '/suppliers'
+      fullPath: '/business/suppliers'
+      preLoaderRoute: typeof BusinessSuppliersRouteImport
       parentRoute: typeof BusinessRoute
     }
     '/business/subscriptions': {
@@ -708,6 +909,13 @@ declare module '@tanstack/react-router' {
       path: '/reels'
       fullPath: '/business/reels'
       preLoaderRoute: typeof BusinessReelsRouteImport
+      parentRoute: typeof BusinessRoute
+    }
+    '/business/purchases': {
+      id: '/business/purchases'
+      path: '/purchases'
+      fullPath: '/business/purchases'
+      preLoaderRoute: typeof BusinessPurchasesRouteImport
       parentRoute: typeof BusinessRoute
     }
     '/business/pos': {
@@ -1032,6 +1240,7 @@ interface BusinessRouteChildren {
   BusinessPartnersRoute: typeof BusinessPartnersRoute
   BusinessPaymentsRoute: typeof BusinessPaymentsRoute
   BusinessPosRoute: typeof BusinessPosRoute
+  BusinessPurchasesRoute: typeof BusinessPurchasesRoute
   BusinessReelsRoute: typeof BusinessReelsRoute
   BusinessReportsRoute: typeof BusinessReportsRoute
   BusinessReviewsRoute: typeof BusinessReviewsRoute
@@ -1039,6 +1248,7 @@ interface BusinessRouteChildren {
   BusinessSettingsRoute: typeof BusinessSettingsRoute
   BusinessStaffRoute: typeof BusinessStaffRoute
   BusinessSubscriptionsRoute: typeof BusinessSubscriptionsRoute
+  BusinessSuppliersRoute: typeof BusinessSuppliersRoute
   BusinessSupportRoute: typeof BusinessSupportRoute
   BusinessIndexRoute: typeof BusinessIndexRoute
 }
@@ -1060,6 +1270,7 @@ const BusinessRouteChildren: BusinessRouteChildren = {
   BusinessPartnersRoute: BusinessPartnersRoute,
   BusinessPaymentsRoute: BusinessPaymentsRoute,
   BusinessPosRoute: BusinessPosRoute,
+  BusinessPurchasesRoute: BusinessPurchasesRoute,
   BusinessReelsRoute: BusinessReelsRoute,
   BusinessReportsRoute: BusinessReportsRoute,
   BusinessReviewsRoute: BusinessReviewsRoute,
@@ -1067,6 +1278,7 @@ const BusinessRouteChildren: BusinessRouteChildren = {
   BusinessSettingsRoute: BusinessSettingsRoute,
   BusinessStaffRoute: BusinessStaffRoute,
   BusinessSubscriptionsRoute: BusinessSubscriptionsRoute,
+  BusinessSuppliersRoute: BusinessSuppliersRoute,
   BusinessSupportRoute: BusinessSupportRoute,
   BusinessIndexRoute: BusinessIndexRoute,
 }
@@ -1075,10 +1287,35 @@ const BusinessRouteWithChildren = BusinessRoute._addFileChildren(
   BusinessRouteChildren,
 )
 
+interface StaffRouteChildren {
+  StaffBookingsRoute: typeof StaffBookingsRoute
+  StaffCalendarRoute: typeof StaffCalendarRoute
+  StaffCustomersRoute: typeof StaffCustomersRoute
+  StaffExpensesRoute: typeof StaffExpensesRoute
+  StaffPaymentsRoute: typeof StaffPaymentsRoute
+  StaffPosRoute: typeof StaffPosRoute
+  StaffSupportRoute: typeof StaffSupportRoute
+  StaffIndexRoute: typeof StaffIndexRoute
+}
+
+const StaffRouteChildren: StaffRouteChildren = {
+  StaffBookingsRoute: StaffBookingsRoute,
+  StaffCalendarRoute: StaffCalendarRoute,
+  StaffCustomersRoute: StaffCustomersRoute,
+  StaffExpensesRoute: StaffExpensesRoute,
+  StaffPaymentsRoute: StaffPaymentsRoute,
+  StaffPosRoute: StaffPosRoute,
+  StaffSupportRoute: StaffSupportRoute,
+  StaffIndexRoute: StaffIndexRoute,
+}
+
+const StaffRouteWithChildren = StaffRoute._addFileChildren(StaffRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
   BusinessRoute: BusinessRouteWithChildren,
+  StaffRoute: StaffRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

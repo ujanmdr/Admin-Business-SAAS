@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+﻿import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import {
@@ -16,11 +16,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export const Route = createFileRoute("/business/bookings")({
-  head: () => ({ meta: [{ title: "Bookings · BRG Suite" }] }),
+  head: () => ({ meta: [{ title: "Bookings Â· BRG Suite" }] }),
   component: BookingsPage,
 });
 
-function BookingsPage() {
+export function BookingsPage() {
   const [open, setOpen] = useState<Booking | null>(null);
   const [modal, setModal] = useState(false);
   const [q, setQ] = useState("");
@@ -80,7 +80,7 @@ function BookingsPage() {
       <div className="rounded-2xl bg-card border border-border p-4 mb-4 flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[220px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by booking ID, customer, service…"
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by booking ID, customer, serviceâ€¦"
             className="w-full rounded-xl border border-border bg-background pl-9 pr-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring/40" />
         </div>
         <FilterSelect label="Range" value={range} onChange={setRange} options={["Today","Last 7 days","Last 30 days","This month","All time"]} />
@@ -143,7 +143,7 @@ function BookingsPage() {
                   <td className="px-4 py-3 text-right font-medium">NPR {b.amount.toLocaleString()}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center gap-1 text-[11px] rounded-full border px-2.5 py-1 ${payTone(b.payment.status)}`}>
-                      {b.payment.method} · {b.payment.status}
+                      {b.payment.method} Â· {b.payment.status}
                     </span>
                   </td>
                   <td className="px-4 py-3">
@@ -181,7 +181,7 @@ function BookingsPage() {
         <div className="flex items-center justify-between px-4 py-3 border-t border-border text-xs text-muted-foreground">
           <span>Showing {rows.length} of {BOOKINGS.length}</span>
           <div className="inline-flex items-center gap-1">
-            <Filter className="h-3 w-3" />Filtered total · NPR {total.toLocaleString()}
+            <Filter className="h-3 w-3" />Filtered total Â· NPR {total.toLocaleString()}
           </div>
         </div>
       </div>
@@ -217,3 +217,4 @@ function FilterSelect({ label, value, onChange, options }: { label: string; valu
     </label>
   );
 }
+

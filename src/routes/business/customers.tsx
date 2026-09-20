@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+﻿import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import {
@@ -16,7 +16,7 @@ import {
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/business/customers")({
-  head: () => ({ meta: [{ title: "Customers · BRG Suite" }] }),
+  head: () => ({ meta: [{ title: "Customers Â· BRG Suite" }] }),
   component: CustomersPage,
 });
 
@@ -48,7 +48,7 @@ function applyFilter(c: Customer, key: string) {
   }
 }
 
-function CustomersPage() {
+export function CustomersPage() {
   const [open, setOpen] = useState<Customer | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [filter, setFilter] = useState<string>("all");
@@ -80,7 +80,7 @@ function CustomersPage() {
       <PageHeader
         eyebrow="CRM"
         title="Customers"
-        description="Your guest book — preferences, history, lifetime value and the relationships that grow Aura."
+        description="Your guest book â€” preferences, history, lifetime value and the relationships that grow Aura."
         actions={
           <div className="flex flex-wrap gap-2">
             <button className="inline-flex items-center gap-2 rounded-xl bg-card border border-border px-3.5 py-2.5 text-sm font-medium hover:bg-muted">
@@ -162,7 +162,7 @@ function CustomersPage() {
       <div className="rounded-2xl bg-card border border-border p-4 mb-4 flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[220px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by name, phone, email…"
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by name, phone, emailâ€¦"
             className="w-full rounded-xl border border-border bg-background pl-9 pr-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring/40" />
         </div>
         <label className="inline-flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-1.5 text-xs">
@@ -229,7 +229,7 @@ function CustomersPage() {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-right">{c.activePackages}</td>
-                  <td className="px-4 py-3 text-right">{c.giftCardBalance ? c.giftCardBalance.toLocaleString() : "—"}</td>
+                  <td className="px-4 py-3 text-right">{c.giftCardBalance ? c.giftCardBalance.toLocaleString() : "â€”"}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center gap-1 text-[11px] font-medium rounded-full border px-2.5 py-1 ${customerStatusTone(c.status)}`}>
                       <span className="h-1.5 w-1.5 rounded-full bg-current" />{c.status}
@@ -264,7 +264,7 @@ function CustomersPage() {
         </div>
         <div className="flex items-center justify-between px-4 py-3 border-t border-border text-xs text-muted-foreground">
           <span>Showing {rows.length} of {CUSTOMERS.length}</span>
-          <span>Lifetime value · NPR {rows.reduce((a, b) => a + b.totalSpend, 0).toLocaleString()}</span>
+          <span>Lifetime value Â· NPR {rows.reduce((a, b) => a + b.totalSpend, 0).toLocaleString()}</span>
         </div>
       </div>
 
@@ -293,3 +293,4 @@ function Kpi({ label, value, icon: Icon, tone }: { label: string; value: number;
 function Th({ children, className = "" }: { children?: React.ReactNode; className?: string }) {
   return <th className={`px-4 py-3 font-medium text-[11px] uppercase tracking-wider ${className}`}>{children}</th>;
 }
+

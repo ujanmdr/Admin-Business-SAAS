@@ -1,5 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
+﻿import { createFileRoute } from "@tanstack/react-router";
+import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { fmt } from "@/lib/finance-data";
@@ -19,7 +19,7 @@ import { usePosStore } from "@/lib/pos-store";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/business/pos")({
-  head: () => ({ meta: [{ title: "POS · BRG Suite" }] }),
+  head: () => ({ meta: [{ title: "POS Â· BRG Suite" }] }),
   component: POSPage,
 });
 
@@ -50,8 +50,24 @@ const METHODS = [
   { v: "Card", icon: CreditCard, tone: "text-foreground" },
 ];
 
-function POSPage() {
+export function POSPage() {
   const store = usePosStore();
+  // RBAC Setup
+  const [userRole, setUserRole] = useState<"manager"|"receptionist"|"provider">("manager");
+  
+  useEffect(() => {
+    const auth = localStorage.getItem("brg_auth");
+    if (auth) {
+      const u = JSON.parse(auth);
+      if (u.role === "staff") {
+        setUserRole(u.staffRole || "provider");
+      } else {
+        setUserRole("manager");
+      }
+    }
+  }, []);
+
+  const [mobileCartOpen, setMobileCartOpen] = useState(false);
   const [bookingQ, setBookingQ] = useState("");
   const [tab, setTab] = useState("service");
   const [q, setQ] = useState("");
@@ -143,7 +159,7 @@ function POSPage() {
     setAppliedRedemption(r);
     setRedeemInput("");
     setShowRedeem(false);
-    toast.success(`Reward applied — ${r.serviceName} is free!`);
+    toast.success(`Reward applied â€” ${r.serviceName} is free!`);
   }
 
   function clearRedemption() {
@@ -240,6 +256,15 @@ function POSPage() {
     setCart((c) => c.map((x) => x.key === key ? { ...x, staff: staffName } : x));
   }
 
+  const handleDiscountChange = (val: number) => {
+    if (userRole === "receptionist" && isDiscountPercent && val > 10) {
+      toast.error("Manager Override Required: Receptionists cannot apply discounts over 10%.");
+      setDiscountVal(10);
+      return;
+    }
+    setDiscountVal(val);
+  };
+
   const subtotal = cart.reduce((s, x) => s + (x.loyaltyFree ? 0 : x.price * x.qty), 0);
   
   // Calculate discount based on type (percentage or fixed)
@@ -281,7 +306,7 @@ function POSPage() {
       </div>
 
       {/* Main 3-Column Layout */}
-      <div className="flex-1 grid lg:grid-cols-[300px_1fr_400px] gap-6 px-6 pb-6 overflow-hidden min-h-0">
+      <div className="flex-1 grid lg:grid-cols-[300px_1fr_400px] gap-6 px-4 lg:px-6 pb-6 overflow-hidden min-h-0 relative">
         
         {/* COL 1: Today's Bookings */}
         <div className="flex flex-col min-h-0">
@@ -437,7 +462,9 @@ function POSPage() {
                   </div>
                   <div className="text-right flex flex-col items-end gap-1 shrink-0">
                     <div className={cn("text-sm font-medium", x.loyaltyFree && "line-through text-muted-foreground")}>{fmt(x.price * x.qty)}</div>
-                    <button onClick={() => remove(x.key)} className="h-6 w-6 rounded border border-transparent hover:border-border hover:bg-sand-soft text-muted-foreground hover:text-rose-500 inline-flex items-center justify-center transition-all opacity-0 group-hover:opacity-100"><Trash className="h-3 w-3"/></button>
+                    {userRole !== "provider" && (
+                    <button onClick={() => remove(x.key)} className="h-6 w-6 rounded border border-transparent hover:border-border hover:bg-sand-soft text-muted-foreground hover:text-rose-500 inline-flex items-center justify-center transition-all lg:opacity-0 lg:group-hover:opacity-100"><Trash className="h-3 w-3"/></button>
+                    )}
                   </div>
                 </div>
               ))
@@ -511,7 +538,7 @@ function POSPage() {
             {/* Totals */}
             <div className="space-y-2 text-xs font-medium pt-2">
               <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span>{fmt(subtotal)}</span></div>
-              {discountAmt > 0 && <div className="flex justify-between text-muted-foreground"><span>Discount {isDiscountPercent ? `(${discountVal}%)` : ""}</span><span>−{fmt(discountAmt)}</span></div>}
+              {discountAmt > 0 && <div className="flex justify-between text-muted-foreground"><span>Discount {isDiscountPercent ? `(${discountVal}%)` : ""}</span><span>âˆ’{fmt(discountAmt)}</span></div>}
               {store.includeTax ? (
                 <div className="flex justify-between text-muted-foreground"><span>Includes {store.taxType.toUpperCase()} ({(store.taxRateBps/100)}%)</span><span>{fmt(vat)}</span></div>
               ) : (
@@ -576,3 +603,7 @@ function POSPage() {
     </div>
   );
 }
+
+
+
+

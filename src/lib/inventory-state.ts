@@ -10,6 +10,7 @@ export interface StockMovement {
   quantityChange: number; // e.g. -12, +15, +21
   currentStock: number;
   note: string;
+  purchaseId?: string;
 }
 
 const PRODUCTS_KEY = "brg_inventory_products";
@@ -178,4 +179,32 @@ export function addNewProduct(productData: Omit<Product, "id" | "stock">, initia
   }
 
   return newProduct;
+}
+
+export function getProductById(id: string): Product | undefined {
+  const products = getInventoryProducts();
+  return products.find((p) => p.id === id);
+}
+
+export interface ReorderSuggestion {
+  product: Product;
+  deficit: number;
+  suggestedQty: number;
+  estimatedCost: number;
+}
+
+export function getReorderSuggestions(): ReorderSuggestion[] {
+  const products = getInventoryProducts();
+  return products
+    .filter((p) => p.stock <= p.threshold)
+    .map((p) => {
+      const deficit = Math.max(0, p.threshold - p.stock);
+      const suggestedQty = Math.max(deficit + p.threshold, 5);
+      return {
+        product: p,
+        deficit,
+        suggestedQty,
+        estimatedCost: suggestedQty * p.costPrice,
+      };
+    });
 }

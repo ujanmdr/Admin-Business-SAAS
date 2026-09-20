@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { Sparkles, ShieldCheck, Building2, KeyRound, Mail, ArrowRight, Eye, EyeOff, AlertCircle } from "lucide-react";
+import { Sparkles, ShieldCheck, Building2, KeyRound, Mail, ArrowRight, Eye, EyeOff, AlertCircle, UserCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/")({
@@ -26,6 +26,8 @@ function AccessPortal() {
           navigate({ to: "/admin" });
         } else if (user.role === "business") {
           navigate({ to: "/business" });
+        } else if (user.role === "staff") {
+          navigate({ to: "/staff" });
         }
       } catch (e) {
         localStorage.removeItem("brg_auth");
@@ -53,6 +55,9 @@ function AccessPortal() {
       } else if (email === "salon@brg.np" && password === "salon123") {
         localStorage.setItem("brg_auth", JSON.stringify({ email, role: "business", name: "Aura Beauty Lounge" }));
         navigate({ to: "/business" });
+      } else if (email === "staff@brg.np" && password === "staff123") {
+        localStorage.setItem("brg_auth", JSON.stringify({ email, role: "staff", name: "Anisha" }));
+        navigate({ to: "/staff" });
       } else {
         setError("Invalid email or password. Use the quick login buttons below to test.");
       }
@@ -60,16 +65,19 @@ function AccessPortal() {
   };
 
   // Quick Login Utility
-  const handleQuickLogin = (role: "admin" | "business") => {
+  const handleQuickLogin = (role: "admin" | "business" | "staff", staffRole?: string) => {
     setLoading(true);
     setTimeout(() => {
       setLoading(false);
       if (role === "admin") {
         localStorage.setItem("brg_auth", JSON.stringify({ email: "admin@brg.np", role: "admin", name: "Super Admin" }));
         navigate({ to: "/admin" });
-      } else {
+      } else if (role === "business") {
         localStorage.setItem("brg_auth", JSON.stringify({ email: "salon@brg.np", role: "business", name: "Aura Beauty Lounge" }));
         navigate({ to: "/business" });
+      } else {
+        localStorage.setItem("brg_auth", JSON.stringify({ email: "staff@brg.np", role: "staff", name: staffRole === "receptionist" ? "Priya (Front Desk)" : "Anisha", staffRole }));
+        navigate({ to: "/staff" });
       }
     }, 300);
   };
@@ -100,22 +108,42 @@ function AccessPortal() {
             <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Quick Sandbox Logins
             </h3>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <button
+                type="button"
                 onClick={() => handleQuickLogin("admin")}
                 className="flex flex-col items-start text-left p-4 rounded-xl border border-border bg-card/40 hover:bg-card hover:border-primary transition-all duration-200 group"
               >
                 <ShieldCheck className="h-5 w-5 text-gold mb-2 group-hover:scale-105 transition-transform" />
                 <span className="text-xs font-semibold text-foreground">Super Admin Suite</span>
-                <span className="text-[10px] text-muted-foreground mt-0.5">Manage plans, approvals & users</span>
+                <span className="text-[10px] text-muted-foreground mt-0.5">Manage plans & users</span>
               </button>
               <button
+                type="button"
                 onClick={() => handleQuickLogin("business")}
                 className="flex flex-col items-start text-left p-4 rounded-xl border border-border bg-card/40 hover:bg-card hover:border-primary transition-all duration-200 group"
               >
                 <Building2 className="h-5 w-5 text-primary mb-2 group-hover:scale-105 transition-transform" />
                 <span className="text-xs font-semibold text-foreground">Business Client Suite</span>
-                <span className="text-[10px] text-muted-foreground mt-0.5">POS, calendars, staff & bookings</span>
+                <span className="text-[10px] text-muted-foreground mt-0.5">POS, calendars, & bookings</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleQuickLogin("staff", "provider")}
+                className="flex flex-col items-start text-left p-4 rounded-xl border border-border bg-card/40 hover:bg-card hover:border-primary transition-all duration-200 group"
+              >
+                <UserCircle className="h-5 w-5 text-blue-500 mb-2 group-hover:scale-105 transition-transform" />
+                <span className="text-xs font-semibold text-foreground">Staff (Provider)</span>
+                <span className="text-[10px] text-muted-foreground mt-0.5">Stylist/Therapist role</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleQuickLogin("staff", "receptionist")}
+                className="flex flex-col items-start text-left p-4 rounded-xl border border-border bg-card/40 hover:bg-card hover:border-primary transition-all duration-200 group"
+              >
+                <UserCircle className="h-5 w-5 text-rose-500 mb-2 group-hover:scale-105 transition-transform" />
+                <span className="text-xs font-semibold text-foreground">Staff (Reception)</span>
+                <span className="text-[10px] text-muted-foreground mt-0.5">Front desk role</span>
               </button>
             </div>
           </div>
@@ -192,20 +220,18 @@ function AccessPortal() {
               <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground text-center">
                 Quick Sandbox Logins
               </h3>
-              <div className="grid grid-cols-2 gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => handleQuickLogin("admin")}
-                  className="text-xs py-2 border-border h-auto"
-                >
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant="outline" onClick={() => handleQuickLogin("admin")} className="text-[10px] py-2 border-border h-auto px-1">
                   Super Admin
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => handleQuickLogin("business")}
-                  className="text-xs py-2 border-border h-auto"
-                >
-                  Business Partner
+                <Button variant="outline" onClick={() => handleQuickLogin("business")} className="text-[10px] py-2 border-border h-auto px-1">
+                  Business
+                </Button>
+                <Button variant="outline" onClick={() => handleQuickLogin("staff", "provider")} className="text-[10px] py-2 border-border h-auto px-1 text-blue-600">
+                  Staff (Provider)
+                </Button>
+                <Button variant="outline" onClick={() => handleQuickLogin("staff", "receptionist")} className="text-[10px] py-2 border-border h-auto px-1 text-rose-600">
+                  Staff (Reception)
                 </Button>
               </div>
             </div>

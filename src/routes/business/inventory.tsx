@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState, useEffect } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -12,9 +12,10 @@ import { fmt, Product } from "@/lib/finance-data";
 import {
   getInventoryProducts, getInventoryMovements, adjustProductStock, addNewProduct, StockMovement
 } from "@/lib/inventory-state";
+import { getSuppliers, Supplier } from "@/lib/supplier-state";
 import {
   Plus, Search, Boxes, AlertTriangle, Clock, TrendingUp, MoreHorizontal,
-  Edit, Eye, ShoppingCart, Filter, ArrowUpDown
+  Edit, Eye, ShoppingCart, Filter, ArrowUpDown, Truck, ArrowRight, CheckCircle2, ChevronRight
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
@@ -30,6 +31,7 @@ export const Route = createFileRoute("/business/inventory")({
 });
 
 const CATS = ["All", "Hair", "Skin", "Nail", "Makeup", "Spa", "Dental", "Consumables"];
+const UNIT_OPTIONS = ["Bottle", "Tube", "Box", "Pack", "Piece", "Carton", "Can", "Packet"];
 
 function isExpiringSoon(expiry: string) {
   if (!expiry || expiry === "—") return false;
@@ -42,11 +44,13 @@ function isExpiringSoon(expiry: string) {
 
 function InventoryPage() {
   const { branch } = useBusiness();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("products");
 
-  // Local state for products and movements
+  // Local state for products, movements, and suppliers
   const [productsList, setProductsList] = useState<Product[]>([]);
   const [movementsList, setMovementsList] = useState<StockMovement[]>([]);
+  const [suppliersList, setSuppliersList] = useState<Supplier[]>([]);
 
   // Search/Filters
   const [q, setQ] = useState("");
@@ -57,7 +61,8 @@ function InventoryPage() {
   const [newName, setNewName] = useState("");
   const [newCat, setNewCat] = useState<Product["category"]>("Hair");
   const [newSku, setNewSku] = useState("");
-  const [newSupplier, setNewSupplier] = useState("");
+  const [newSupplierId, setNewSupplierId] = useState("");
+  const [newUnitType, setNewUnitType] = useState("Bottle");
   const [newCost, setNewCost] = useState(0);
   const [newSelling, setNewSelling] = useState(0);
   const [newExpiry, setNewExpiry] = useState("—");
@@ -75,6 +80,7 @@ function InventoryPage() {
   const refreshState = () => {
     setProductsList(getInventoryProducts());
     setMovementsList(getInventoryMovements());
+    setSuppliersList(getSuppliers());
   };
 
   useEffect(() => {
@@ -107,10 +113,11 @@ function InventoryPage() {
   const lowStock = productsList.filter((p) => p.stock <= p.threshold && p.stock > 0);
   const outOfStock = productsList.filter((p) => p.stock === 0);
   const expiring = productsList.filter((p) => isExpiringSoon(p.expiry));
+  const reorderNeeded = productsList.filter((p) => p.stock <= p.threshold);
 
   const kpis = [
     { label: "Total SKUs", value: String(productsList.length), icon: Boxes, tone: "bg-sand-soft" },
-    { label: "Low Stock", value: String(lowStock.length), icon: AlertTriangle, tone: "bg-rose-soft" },
+    { label: "Low / Out of Stock", value: String(reorderNeeded.length), icon: AlertTriangle, tone: reorderNeeded.length > 0 ? "bg-rose-soft text-rose" : "bg-sand-soft" },
     { label: "Expiring Soon", value: String(expiring.length), icon: Clock, tone: "bg-[color-mix(in_oklab,var(--gold)_22%,white)]" },
     { label: "Inventory Value", value: fmt(productsList.reduce((s, p) => s + p.stock * p.costPrice, 0)), icon: TrendingUp, tone: "bg-mist-soft" },
   ];
@@ -123,12 +130,17 @@ function InventoryPage() {
       return;
     }
 
+    const matchedSup = suppliersList.find((s) => s.id === newSupplierId);
+    const supplierDisplayName = matchedSup ? matchedSup.name : "Direct Import";
+
     addNewProduct(
       {
-        name: newName,
+        name: newName.trim(),
         category: newCat,
-        sku: newSku,
-        supplier: newSupplier || "Direct Import",
+        sku: newSku.trim(),
+        supplier: supplierDisplayName,
+        supplierId: newSupplierId || undefined,
+        unitType: newUnitType,
         costPrice: Number(newCost),
         sellingPrice: Number(newSelling),
         expiry: newExpiry || "—",
@@ -145,7 +157,8 @@ function InventoryPage() {
     // Reset fields
     setNewName("");
     setNewSku("");
-    setNewSupplier("");
+    setNewSupplierId("");
+    setNewUnitType("Bottle");
     setNewCost(0);
     setNewSelling(0);
     setNewExpiry("—");
@@ -184,19 +197,66 @@ function InventoryPage() {
     refreshState();
   };
 
+  const handleQuickReorder = (p: Product) => {
+    const matchedSup = suppliersList.find(
+      (s) => s.id === p.supplierId || s.name.toLowerCase() === p.supplier.toLowerCase()
+    );
+    navigate({
+      to: "/business/purchases",
+      search: {
+        reorderProductId: p.id,
+        supplierId: matchedSup?.id || p.supplierId || "",
+      } as any,
+    });
+  };
+
+  const handleNavigateSupplier = (p: Product) => {
+    const matchedSup = suppliersList.find(
+      (s) => s.id === p.supplierId || s.name.toLowerCase() === p.supplier.toLowerCase()
+    );
+    if (matchedSup) {
+      navigate({
+        to: "/business/suppliers",
+        search: { supplierId: matchedSup.id } as any,
+      });
+    } else {
+      navigate({ to: "/business/suppliers" });
+    }
+  };
+
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         eyebrow="Finance"
         title="Inventory Manager"
-        description="Monitor product definitions, current stock, and full stock movement histories across all branches."
+        description="Monitor product stock levels, packaging units, reorder thresholds, and incoming wholesale supplier restocks."
         actions={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            {/* Direct Link to Purchases Log */}
+            <Button
+              variant="outline"
+              onClick={() => navigate({ to: "/business/purchases" })}
+              className="rounded-xl border-border"
+            >
+              <ShoppingCart className="h-4 w-4 mr-1.5" />
+              Purchases Log
+            </Button>
+
+            {/* Direct Link to Suppliers */}
+            <Button
+              variant="outline"
+              onClick={() => navigate({ to: "/business/suppliers" })}
+              className="rounded-xl border-border"
+            >
+              <Truck className="h-4 w-4 mr-1.5" />
+              Suppliers
+            </Button>
+
             {/* Adjust Stock Button Dialog */}
             <Dialog open={adjustOpen} onOpenChange={setAdjustOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline" className="rounded-xl border-border">
-                  <ArrowUpDown className="h-4 w-4" />Adjust Stock
+                  <ArrowUpDown className="h-4 w-4 mr-1.5" />Adjust Stock
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-md">
@@ -214,7 +274,7 @@ function InventoryPage() {
                       <SelectContent>
                         {productsList.map((p) => (
                           <SelectItem key={p.id} value={p.id}>
-                            {p.name} ({p.sku}) — Stock: {p.stock}
+                            {p.name} ({p.sku}) — Stock: {p.stock} {p.unitType ? `(${p.unitType})` : ""}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -270,10 +330,10 @@ function InventoryPage() {
             <Dialog open={addOpen} onOpenChange={setAddOpen}>
               <DialogTrigger asChild>
                 <Button className="rounded-xl bg-foreground text-background hover:bg-foreground/90">
-                  <Plus className="h-4 w-4" />Add Product
+                  <Plus className="h-4 w-4 mr-1.5" />Add Product
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-lg">
+              <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle className="font-serif text-xl">Register New Product</DialogTitle>
                   <DialogDescription>Add a new SKU definition to the inventory database.</DialogDescription>
@@ -281,26 +341,28 @@ function InventoryPage() {
                 <form onSubmit={handleAddProductSubmit} className="space-y-4 pt-2">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <label className="text-xs font-semibold text-muted-foreground">Product Name</label>
+                      <label className="text-xs font-semibold text-muted-foreground">Product Name *</label>
                       <Input
                         placeholder="e.g. Olaplex No. 4"
                         value={newName}
                         onChange={(e) => setNewName(e.target.value)}
                         className="border-border bg-background text-sm"
+                        required
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-semibold text-muted-foreground">SKU Code</label>
+                      <label className="text-xs font-semibold text-muted-foreground">SKU Code *</label>
                       <Input
                         placeholder="e.g. OLP-N4-250"
                         value={newSku}
                         onChange={(e) => setNewSku(e.target.value)}
-                        className="border-border bg-background text-sm"
+                        className="border-border bg-background text-sm font-mono"
+                        required
                       />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-3 gap-3">
                     <div className="space-y-1">
                       <label className="text-xs font-semibold text-muted-foreground">Category</label>
                       <Select value={newCat} onValueChange={(v: any) => setNewCat(v)}>
@@ -317,26 +379,36 @@ function InventoryPage() {
 
                     <div className="space-y-1">
                       <label className="text-xs font-semibold text-muted-foreground">Supplier</label>
-                      <Input
-                        placeholder="Supplier name"
-                        value={newSupplier}
-                        onChange={(e) => setNewSupplier(e.target.value)}
-                        className="border-border bg-background text-sm"
-                      />
+                      <Select value={newSupplierId} onValueChange={setNewSupplierId}>
+                        <SelectTrigger className="border-border bg-background text-sm">
+                          <SelectValue placeholder="Pick supplier..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {suppliersList.map((s) => (
+                            <SelectItem key={s.id} value={s.id}>
+                              {s.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-xs font-semibold text-muted-foreground">Expiry (YYYY-MM)</label>
-                      <Input
-                        placeholder="e.g. 2027-08"
-                        value={newExpiry}
-                        onChange={(e) => setNewExpiry(e.target.value)}
-                        className="border-border bg-background text-sm"
-                      />
+                      <label className="text-xs font-semibold text-muted-foreground">Unit of Measure</label>
+                      <Select value={newUnitType} onValueChange={setNewUnitType}>
+                        <SelectTrigger className="border-border bg-background text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {UNIT_OPTIONS.map((u) => (
+                            <SelectItem key={u} value={u}>{u}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <label className="text-xs font-semibold text-muted-foreground">Cost Price</label>
                       <Input
@@ -356,23 +428,35 @@ function InventoryPage() {
                         className="border-border bg-background text-sm"
                       />
                     </div>
+                  </div>
 
+                  <div className="grid grid-cols-3 gap-3">
                     <div className="space-y-1">
                       <label className="text-xs font-semibold text-muted-foreground">Initial Stock</label>
                       <Input
                         type="number"
                         value={newInitialStock || ""}
                         onChange={(e) => setNewInitialStock(Number(e.target.value))}
+                        className="border-border bg-background text-sm font-semibold"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-muted-foreground">Low Stock Alert</label>
+                      <Input
+                        type="number"
+                        value={newThreshold || ""}
+                        onChange={(e) => setNewThreshold(Number(e.target.value))}
                         className="border-border bg-background text-sm"
                       />
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-xs font-semibold text-muted-foreground">Min Threshold</label>
+                      <label className="text-xs font-semibold text-muted-foreground">Expiry (YYYY-MM)</label>
                       <Input
-                        type="number"
-                        value={newThreshold || ""}
-                        onChange={(e) => setNewThreshold(Number(e.target.value))}
+                        placeholder="2027-08"
+                        value={newExpiry}
+                        onChange={(e) => setNewExpiry(e.target.value)}
                         className="border-border bg-background text-sm"
                       />
                     </div>
@@ -381,7 +465,7 @@ function InventoryPage() {
                   <div className="flex items-center justify-between border-t border-border pt-3">
                     <div>
                       <div className="text-sm font-medium">Retail item</div>
-                      <div className="text-xs text-muted-foreground">Available for counter checkout sales</div>
+                      <div className="text-xs text-muted-foreground">Available for front desk checkout sales</div>
                     </div>
                     <Switch checked={newRetail} onCheckedChange={setNewRetail} />
                   </div>
@@ -397,7 +481,7 @@ function InventoryPage() {
       />
 
       {/* Overview stats cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {kpis.map((k) => {
           const Icon = k.icon;
           return (
@@ -412,30 +496,71 @@ function InventoryPage() {
         })}
       </div>
 
-      {/* Alerts */}
-      {(lowStock.length + outOfStock.length + expiring.length) > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-8">
-          {outOfStock.length > 0 && (
-            <div className="rounded-2xl border border-rose bg-rose-soft p-4">
-              <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-foreground/70"><AlertTriangle className="h-3.5 w-3.5" />Out of stock</div>
-              <div className="font-serif text-2xl mt-1">{outOfStock.length} items</div>
-              <div className="text-xs text-foreground/70 mt-1">{outOfStock.map((p) => p.name).slice(0, 2).join(", ")}{outOfStock.length > 2 && ` +${outOfStock.length - 2}`}</div>
+      {/* SMART REORDER SUGGESTIONS BANNER (If items are low/out of stock) */}
+      {reorderNeeded.length > 0 && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 brg-card-shadow">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 mb-3 border-b border-amber-200/60 pb-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-700" />
+                <h3 className="font-serif text-base font-bold text-amber-950">
+                  Restock Recommendations ({reorderNeeded.length} items below minimum)
+                </h3>
+              </div>
+              <p className="text-xs text-amber-800/80 mt-0.5">
+                These products are below safe salon thresholds. Click Reorder to instantly generate a vendor purchase order.
+              </p>
             </div>
-          )}
-          {lowStock.length > 0 && (
-            <div className="rounded-2xl border border-border bg-sand-soft p-4">
-              <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-foreground/70"><AlertTriangle className="h-3.5 w-3.5" />Low stock</div>
-              <div className="font-serif text-2xl mt-1">{lowStock.length} items</div>
-              <div className="text-xs text-foreground/70 mt-1">{lowStock.map((p) => p.name).slice(0, 2).join(", ")}{lowStock.length > 2 && ` +${lowStock.length - 2}`}</div>
-            </div>
-          )}
-          {expiring.length > 0 && (
-            <div className="rounded-2xl border border-[color-mix(in_oklab,var(--gold)_40%,white)] bg-[color-mix(in_oklab,var(--gold)_18%,white)] p-4">
-              <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-foreground/70"><Clock className="h-3.5 w-3.5" />Expiring soon</div>
-              <div className="font-serif text-2xl mt-1">{expiring.length} items</div>
-              <div className="text-xs text-foreground/70 mt-1">{expiring.map((p) => p.name).slice(0, 2).join(", ")}{expiring.length > 2 && ` +${expiring.length - 2}`}</div>
-            </div>
-          )}
+
+            <Button
+              size="sm"
+              className="bg-amber-900 text-amber-50 hover:bg-amber-950 rounded-xl text-xs h-8"
+              onClick={() => {
+                const first = reorderNeeded[0];
+                handleQuickReorder(first);
+              }}
+            >
+              <ShoppingCart className="h-3.5 w-3.5 mr-1.5" />
+              Start Bulk Reorder
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+            {reorderNeeded.map((p) => {
+              const deficit = Math.max(p.threshold * 2 - p.stock, 5);
+              return (
+                <div
+                  key={p.id}
+                  className="rounded-xl border border-amber-200/80 bg-background/90 p-3 flex items-center justify-between gap-2 shadow-xs"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold text-xs text-foreground truncate">{p.name}</div>
+                    <div className="text-[11px] text-muted-foreground flex items-center gap-1.5 mt-0.5">
+                      <span className="text-rose font-medium">Stock: {p.stock}</span>
+                      <span>·</span>
+                      <span>Min: {p.threshold}</span>
+                      <span>·</span>
+                      <span className="truncate">{p.supplier}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 font-semibold">
+                      +{deficit} {p.unitType || "units"}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 px-2.5 rounded-lg text-xs border-amber-300 hover:bg-amber-100/60 text-amber-950"
+                      onClick={() => handleQuickReorder(p)}
+                    >
+                      Reorder
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -443,10 +568,10 @@ function InventoryPage() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="bg-sand-soft h-11 p-1 rounded-xl">
           <TabsTrigger value="products" className="rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm px-5">
-            Products List
+            Products Catalog
           </TabsTrigger>
           <TabsTrigger value="movements" className="rounded-lg data-[state=active]:bg-card data-[state=active]:shadow-sm px-5">
-            Stock Movements
+            Stock Movements Log
           </TabsTrigger>
         </TabsList>
 
@@ -485,19 +610,20 @@ function InventoryPage() {
                   <tr>
                     <th className="text-left px-4 py-3">Product</th>
                     <th className="text-left px-4 py-3">SKU</th>
-                    <th className="text-left px-4 py-3">Stock</th>
+                    <th className="text-left px-4 py-3">Unit</th>
+                    <th className="text-left px-4 py-3">Current Stock</th>
                     <th className="text-left px-4 py-3">Supplier</th>
                     <th className="text-left px-4 py-3">Cost</th>
                     <th className="text-left px-4 py-3">Selling</th>
                     <th className="text-left px-4 py-3">Expiry</th>
-                    <th className="text-left px-4 py-3">Retail</th>
+                    <th className="text-left px-4 py-3">Type</th>
                     <th className="px-4 py-3"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="text-center py-10 text-muted-foreground text-sm">
+                      <td colSpan={10} className="text-center py-10 text-muted-foreground text-sm">
                         No products found matching criteria.
                       </td>
                     </tr>
@@ -512,6 +638,9 @@ function InventoryPage() {
                             <div className="text-xs text-muted-foreground">{p.category}</div>
                           </td>
                           <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{p.sku}</td>
+                          <td className="px-4 py-3 text-xs font-medium text-muted-foreground">
+                            {p.unitType || "Bottle"}
+                          </td>
                           <td className="px-4 py-3">
                             <div className={cn(
                               "inline-flex items-center gap-1.5 text-sm font-medium",
@@ -523,11 +652,21 @@ function InventoryPage() {
                             </div>
                             <div className="text-[11px] text-muted-foreground">min {p.threshold}</div>
                           </td>
-                          <td className="px-4 py-3 text-xs">{p.supplier}</td>
-                          <td className="px-4 py-3">{fmt(p.costPrice)}</td>
-                          <td className="px-4 py-3">{p.sellingPrice ? fmt(p.sellingPrice) : <span className="text-muted-foreground">—</span>}</td>
+                          <td className="px-4 py-3 text-xs">
+                            <button
+                              type="button"
+                              onClick={() => handleNavigateSupplier(p)}
+                              className="font-medium text-foreground hover:underline text-left inline-flex items-center gap-1 group"
+                              title="Click to view supplier profile and purchase history"
+                            >
+                              <span>{p.supplier}</span>
+                              <Truck className="h-3 w-3 text-muted-foreground group-hover:text-primary transition" />
+                            </button>
+                          </td>
+                          <td className="px-4 py-3 font-mono">{fmt(p.costPrice)}</td>
+                          <td className="px-4 py-3 font-mono">{p.sellingPrice ? fmt(p.sellingPrice) : <span className="text-muted-foreground">—</span>}</td>
                           <td className="px-4 py-3">
-                            <span className={cn("text-xs", isExpiringSoon(p.expiry) && "text-gold font-medium")}>{p.expiry}</span>
+                            <span className={cn("text-xs font-mono", isExpiringSoon(p.expiry) && "text-gold font-medium")}>{p.expiry}</span>
                           </td>
                           <td className="px-4 py-3">
                             <span className={cn(
@@ -543,9 +682,21 @@ function InventoryPage() {
                                 <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem><Eye className="h-4 w-4" />View Details</DropdownMenuItem>
-                                <DropdownMenuItem><Edit className="h-4 w-4" />Edit Info</DropdownMenuItem>
-                                <DropdownMenuItem><ShoppingCart className="h-4 w-4" />Restock Order</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleQuickReorder(p)}>
+                                  <ShoppingCart className="h-4 w-4 mr-2" />
+                                  Reorder / Purchase
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleNavigateSupplier(p)}>
+                                  <Truck className="h-4 w-4 mr-2" />
+                                  View Supplier Profile
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => {
+                                  setAdjProductId(p.id);
+                                  setAdjustOpen(true);
+                                }}>
+                                  <ArrowUpDown className="h-4 w-4 mr-2" />
+                                  Manual Adjust Stock
+                                </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </td>
@@ -583,7 +734,7 @@ function InventoryPage() {
                     <th className="text-left px-4 py-3">Movement Type</th>
                     <th className="text-left px-4 py-3">Quantity Change</th>
                     <th className="text-left px-4 py-3">Current Stock</th>
-                    <th className="text-left px-4 py-3">Note</th>
+                    <th className="text-left px-4 py-3">Note / Reference</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -598,7 +749,7 @@ function InventoryPage() {
                       const isDecrease = m.quantityChange < 0;
                       return (
                         <tr key={m.id} className="border-t border-border hover:bg-sand-soft/30 transition-colors">
-                          <td className="px-4 py-3 text-xs text-muted-foreground font-medium">{m.date}</td>
+                          <td className="px-4 py-3 text-xs text-muted-foreground font-medium whitespace-nowrap">{m.date}</td>
                           <td className="px-4 py-3">
                             <div className="font-medium text-foreground">{m.productName}</div>
                             <div className="text-xs font-mono text-muted-foreground">{m.sku}</div>
@@ -608,7 +759,7 @@ function InventoryPage() {
                               "text-xs px-2 py-0.5 rounded border",
                               m.movementType === "Damaged" && "bg-red-50 text-red-600 border-red-100",
                               m.movementType === "Initial Stock" && "bg-slate-50 text-slate-600 border-slate-100",
-                              m.movementType === "Restock" && "bg-green-50 text-green-600 border-green-100",
+                              m.movementType === "Restock" && "bg-green-50 text-green-600 border-green-100 font-semibold",
                               m.movementType.includes("Increase") && "bg-green-50 text-green-600 border-green-100",
                               m.movementType.includes("Decrease") && "bg-amber-50 text-amber-600 border-amber-100",
                             )}>
