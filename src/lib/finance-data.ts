@@ -41,6 +41,8 @@ export type Product = {
   supplier: string;
   supplierId?: string;
   unitType?: string; // "Bottle" | "Box" | "Piece" | "Tube" | "Carton" | "Packet" | "Pack" | "Can"
+  size?: string; // e.g. "250ml", "1000ml", "60ml", "100g"
+  containerType?: string; // e.g. "Bottle", "Tube", "Pump Bottle", "Jar", "Box", "Can"
   costPrice: number;
   sellingPrice: number;
   expiry: string;

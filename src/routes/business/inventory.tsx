@@ -15,7 +15,8 @@ import {
 import { getSuppliers, Supplier } from "@/lib/supplier-state";
 import {
   Plus, Search, Boxes, AlertTriangle, Clock, TrendingUp, MoreHorizontal,
-  Edit, Eye, ShoppingCart, Filter, ArrowUpDown, Truck, ArrowRight, CheckCircle2, ChevronRight
+  Edit, Eye, ShoppingCart, Filter, ArrowUpDown, Truck, ArrowRight, CheckCircle2, ChevronRight,
+  Layers, Sparkles, Trash2, PackagePlus
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem,
@@ -24,6 +25,18 @@ import { cn } from "@/lib/utils";
 import { useBusiness } from "@/components/BusinessProvider";
 import { BranchSelectorFallback } from "@/components/BranchSelectorFallback";
 import { toast } from "sonner";
+
+interface InventoryVariantRow {
+  id: string;
+  size: string;
+  containerType: string;
+  sku: string;
+  costPrice: number;
+  sellingPrice: number;
+  initialStock: number;
+  threshold: number;
+  retail: boolean;
+}
 
 export const Route = createFileRoute("/business/inventory")({
   head: () => ({ meta: [{ title: "Inventory · BRG Suite" }] }),
@@ -43,7 +56,7 @@ function isExpiringSoon(expiry: string) {
 }
 
 function InventoryPage() {
-  const { branch } = useBusiness();
+  const { branch } = useBusiness() as any;
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("products");
 
@@ -69,6 +82,68 @@ function InventoryPage() {
   const [newInitialStock, setNewInitialStock] = useState(0);
   const [newThreshold, setNewThreshold] = useState(5);
   const [newRetail, setNewRetail] = useState(true);
+
+  // Variant generator state for Inventory page
+  const [hasVariants, setHasVariants] = useState(false);
+  const [variantRows, setVariantRows] = useState<InventoryVariantRow[]>([
+    { id: "v-1", size: "250ml", containerType: "Bottle", sku: "", costPrice: 0, sellingPrice: 0, initialStock: 0, threshold: 5, retail: true },
+    { id: "v-2", size: "1000ml (1L)", containerType: "Pump Bottle", sku: "", costPrice: 0, sellingPrice: 0, initialStock: 0, threshold: 3, retail: false },
+  ]);
+
+  const resetAddProductForm = () => {
+    const baseCode = `PRD-${Date.now().toString().slice(-4)}`;
+    setNewName("");
+    setNewCat("Hair");
+    setNewSku(baseCode);
+    setNewSupplierId(suppliersList[0]?.id || "");
+    setNewUnitType("Bottle");
+    setNewCost(0);
+    setNewSelling(0);
+    setNewExpiry("2027-12");
+    setNewInitialStock(0);
+    setNewThreshold(5);
+    setNewRetail(true);
+    setHasVariants(false);
+    setVariantRows([
+      { id: "v-1", size: "250ml", containerType: "Bottle", sku: `${baseCode}-250B`, costPrice: 0, sellingPrice: 0, initialStock: 0, threshold: 5, retail: true },
+      { id: "v-2", size: "1000ml (1L)", containerType: "Pump Bottle", sku: `${baseCode}-1000PB`, costPrice: 0, sellingPrice: 0, initialStock: 0, threshold: 3, retail: false },
+    ]);
+  };
+
+  const addVariantRow = (size: string, containerType: string, defaultRetail: boolean = true) => {
+    const cleanSize = size.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+    const cleanCont = containerType.slice(0, 2).toUpperCase();
+    const base = newSku.trim() || `PRD-${Date.now().toString().slice(-4)}`;
+    const generatedSku = `${base}-${cleanSize || "VAR"}${cleanCont}`;
+    setVariantRows((prev) => [
+      ...prev,
+      {
+        id: `v-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        size,
+        containerType,
+        sku: generatedSku,
+        costPrice: Number(newCost) || 0,
+        sellingPrice: defaultRetail ? Number(newSelling) || 0 : 0,
+        initialStock: Number(newInitialStock) || 0,
+        threshold: 5,
+        retail: defaultRetail,
+      },
+    ]);
+  };
+
+  const updateVariantRow = (id: string, field: keyof InventoryVariantRow, value: any) => {
+    setVariantRows((prev) =>
+      prev.map((row) => (row.id === id ? { ...row, [field]: value } : row))
+    );
+  };
+
+  const removeVariantRow = (id: string) => {
+    if (variantRows.length <= 1) {
+      toast.error("At least one variant is required.");
+      return;
+    }
+    setVariantRows((prev) => prev.filter((row) => row.id !== id));
+  };
 
   // "Adjust Stock" Dialog Form State
   const [adjustOpen, setAdjustOpen] = useState(false);
@@ -125,13 +200,65 @@ function InventoryPage() {
   // Submit Handler: Add Product
   const handleAddProductSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newName.trim() || !newSku.trim()) {
-      toast.error("Please fill in Product Name and SKU.");
+    if (!newName.trim()) {
+      toast.error("Please fill in Product Name.");
       return;
     }
 
     const matchedSup = suppliersList.find((s) => s.id === newSupplierId);
     const supplierDisplayName = matchedSup ? matchedSup.name : "Direct Import";
+
+    if (hasVariants) {
+      if (variantRows.length === 0) {
+        toast.error("Please add at least one variant or disable variant mode.");
+        return;
+      }
+
+      for (const v of variantRows) {
+        if (!v.size.trim()) {
+          toast.error("Each variant must have a specified size (e.g. 250ml, 1000ml).");
+          return;
+        }
+      }
+
+      const basePrefix = newSku.trim() || `PRD-${Date.now().toString().slice(-4)}`;
+      for (let i = 0; i < variantRows.length; i++) {
+        const v = variantRows[i];
+        const vSku = v.sku.trim() || `${basePrefix}-${v.size.replace(/[^a-zA-Z0-9]/g, "")}-${i + 1}`;
+        const compoundName = `${newName.trim()} · ${v.size.trim()} ${v.containerType}`;
+
+        addNewProduct(
+          {
+            name: compoundName,
+            category: newCat,
+            sku: vSku,
+            supplier: supplierDisplayName,
+            supplierId: newSupplierId || undefined,
+            unitType: v.containerType || "Bottle",
+            size: v.size.trim(),
+            containerType: v.containerType,
+            costPrice: Number(v.costPrice) || 0,
+            sellingPrice: v.retail ? Number(v.sellingPrice) || 0 : 0,
+            expiry: newExpiry || "2027-12",
+            threshold: Number(v.threshold) || 5,
+            retail: Boolean(v.retail),
+            usedIn: ["Salon services"],
+          },
+          Number(v.initialStock) || 0
+        );
+      }
+
+      toast.success(`Registered ${variantRows.length} variants for "${newName.trim()}"!`);
+      setAddOpen(false);
+      refreshState();
+      resetAddProductForm();
+      return;
+    }
+
+    if (!newSku.trim()) {
+      toast.error("Please provide an SKU code.");
+      return;
+    }
 
     addNewProduct(
       {
@@ -141,6 +268,8 @@ function InventoryPage() {
         supplier: supplierDisplayName,
         supplierId: newSupplierId || undefined,
         unitType: newUnitType,
+        size: undefined,
+        containerType: newUnitType,
         costPrice: Number(newCost),
         sellingPrice: Number(newSelling),
         expiry: newExpiry || "—",
@@ -153,18 +282,7 @@ function InventoryPage() {
 
     toast.success(`Product "${newName}" added successfully.`);
     setAddOpen(false);
-    
-    // Reset fields
-    setNewName("");
-    setNewSku("");
-    setNewSupplierId("");
-    setNewUnitType("Bottle");
-    setNewCost(0);
-    setNewSelling(0);
-    setNewExpiry("—");
-    setNewInitialStock(0);
-    setNewThreshold(5);
-    
+    resetAddProductForm();
     refreshState();
   };
 
@@ -326,47 +444,72 @@ function InventoryPage() {
               </DialogContent>
             </Dialog>
 
-            {/* Add Product Button Dialog */}
-            <Dialog open={addOpen} onOpenChange={setAddOpen}>
+            {/* Add Product Button Dialog with Variant Generator */}
+            <Dialog
+              open={addOpen}
+              onOpenChange={(open) => {
+                setAddOpen(open);
+                if (open) resetAddProductForm();
+              }}
+            >
               <DialogTrigger asChild>
                 <Button className="rounded-xl bg-foreground text-background hover:bg-foreground/90">
                   <Plus className="h-4 w-4 mr-1.5" />Add Product
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+              <DialogContent className={cn("max-h-[92vh] overflow-y-auto transition-all duration-200", hasVariants ? "max-w-3xl" : "max-w-lg")}>
                 <DialogHeader>
-                  <DialogTitle className="font-serif text-xl">Register New Product</DialogTitle>
-                  <DialogDescription>Add a new SKU definition to the inventory database.</DialogDescription>
+                  <div className="flex items-center justify-between">
+                    <DialogTitle className="font-serif text-xl flex items-center gap-2">
+                      <PackagePlus className="h-5 w-5 text-primary" />
+                      Register New Product
+                    </DialogTitle>
+                    <div className="flex items-center gap-2 pr-6">
+                      <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                        <Layers className="h-3.5 w-3.5 text-primary" /> Multiple Sizes / Types
+                      </span>
+                      <Switch
+                        checked={hasVariants}
+                        onCheckedChange={(checked) => {
+                          setHasVariants(checked);
+                          if (checked && variantRows.length === 0) {
+                            const baseCode = newSku.trim() || `PRD-${Date.now().toString().slice(-4)}`;
+                            setVariantRows([
+                              { id: "v-1", size: "250ml", containerType: "Bottle", sku: `${baseCode}-250B`, costPrice: newCost || 0, sellingPrice: newSelling || 0, initialStock: newInitialStock || 0, threshold: 5, retail: true },
+                              { id: "v-2", size: "1000ml (1L)", containerType: "Pump Bottle", sku: `${baseCode}-1000PB`, costPrice: (newCost ? newCost * 3 : 0), sellingPrice: 0, initialStock: 0, threshold: 3, retail: false },
+                            ]);
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <DialogDescription>
+                    {hasVariants
+                      ? "Define a base product line and generate all of its sizes, container types (bottles, tubes, jars), SKUs, and retail vs backbar pricing."
+                      : "Add a new SKU definition to the inventory database."}
+                  </DialogDescription>
                 </DialogHeader>
+
                 <form onSubmit={handleAddProductSubmit} className="space-y-4 pt-2">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-muted-foreground">Product Name *</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                    <div className={cn("space-y-1.5", hasVariants ? "sm:col-span-5" : "sm:col-span-12")}>
+                      <label className="text-xs font-semibold text-muted-foreground">
+                        {hasVariants ? "Base Product Brand & Name *" : "Product Name *"}
+                      </label>
                       <Input
-                        placeholder="e.g. Olaplex No. 4"
+                        placeholder={hasVariants ? "e.g. Olaplex No. 4 Shampoo" : "e.g. Olaplex No. 4"}
                         value={newName}
                         onChange={(e) => setNewName(e.target.value)}
                         className="border-border bg-background text-sm"
                         required
+                        autoFocus
                       />
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-muted-foreground">SKU Code *</label>
-                      <Input
-                        placeholder="e.g. OLP-N4-250"
-                        value={newSku}
-                        onChange={(e) => setNewSku(e.target.value)}
-                        className="border-border bg-background text-sm font-mono"
-                        required
-                      />
-                    </div>
-                  </div>
 
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="space-y-1">
+                    <div className={cn("space-y-1.5", hasVariants ? "sm:col-span-3" : "sm:col-span-6")}>
                       <label className="text-xs font-semibold text-muted-foreground">Category</label>
                       <Select value={newCat} onValueChange={(v: any) => setNewCat(v)}>
-                        <SelectTrigger className="border-border bg-background text-sm">
+                        <SelectTrigger className="border-border bg-background text-sm h-9">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -377,10 +520,10 @@ function InventoryPage() {
                       </Select>
                     </div>
 
-                    <div className="space-y-1">
+                    <div className={cn("space-y-1.5", hasVariants ? "sm:col-span-4" : "sm:col-span-6")}>
                       <label className="text-xs font-semibold text-muted-foreground">Supplier</label>
                       <Select value={newSupplierId} onValueChange={setNewSupplierId}>
-                        <SelectTrigger className="border-border bg-background text-sm">
+                        <SelectTrigger className="border-border bg-background text-sm h-9">
                           <SelectValue placeholder="Pick supplier..." />
                         </SelectTrigger>
                         <SelectContent>
@@ -392,87 +535,307 @@ function InventoryPage() {
                         </SelectContent>
                       </Select>
                     </div>
-
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-muted-foreground">Unit of Measure</label>
-                      <Select value={newUnitType} onValueChange={setNewUnitType}>
-                        <SelectTrigger className="border-border bg-background text-sm">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {UNIT_OPTIONS.map((u) => (
-                            <SelectItem key={u} value={u}>{u}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-muted-foreground">Cost Price</label>
-                      <Input
-                        type="number"
-                        value={newCost || ""}
-                        onChange={(e) => setNewCost(Number(e.target.value))}
-                        className="border-border bg-background text-sm"
-                      />
-                    </div>
+                  {!hasVariants && (
+                    <>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-muted-foreground">SKU Code *</label>
+                          <Input
+                            placeholder="e.g. OLP-N4-250"
+                            value={newSku}
+                            onChange={(e) => setNewSku(e.target.value)}
+                            className="border-border bg-background text-sm font-mono"
+                            required
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-muted-foreground">Unit of Measure</label>
+                          <Select value={newUnitType} onValueChange={setNewUnitType}>
+                            <SelectTrigger className="border-border bg-background text-sm">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {UNIT_OPTIONS.map((u) => (
+                                <SelectItem key={u} value={u}>{u}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
 
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-muted-foreground">Selling Price</label>
-                      <Input
-                        type="number"
-                        value={newSelling || ""}
-                        onChange={(e) => setNewSelling(Number(e.target.value))}
-                        className="border-border bg-background text-sm"
-                      />
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-muted-foreground">Cost Price</label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={newCost || ""}
+                            onChange={(e) => setNewCost(Number(e.target.value))}
+                            className="border-border bg-background text-sm"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-muted-foreground">Selling Price</label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={newSelling || ""}
+                            onChange={(e) => setNewSelling(Number(e.target.value))}
+                            className="border-border bg-background text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-muted-foreground">Initial Stock</label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={newInitialStock || ""}
+                            onChange={(e) => setNewInitialStock(Number(e.target.value))}
+                            className="border-border bg-background text-sm font-semibold"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-muted-foreground">Low Stock Alert</label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={newThreshold || ""}
+                            onChange={(e) => setNewThreshold(Number(e.target.value))}
+                            className="border-border bg-background text-sm"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-xs font-semibold text-muted-foreground">Expiry (YYYY-MM)</label>
+                          <Input
+                            placeholder="2027-08"
+                            value={newExpiry}
+                            onChange={(e) => setNewExpiry(e.target.value)}
+                            className="border-border bg-background text-sm"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between border-t border-border pt-3">
+                        <div>
+                          <div className="text-sm font-medium">Retail item</div>
+                          <div className="text-xs text-muted-foreground">Available for front desk checkout sales</div>
+                        </div>
+                        <Switch checked={newRetail} onCheckedChange={setNewRetail} />
+                      </div>
+                    </>
+                  )}
+
+                  {hasVariants && (
+                    <div className="space-y-3 pt-1">
+                      {/* Presets */}
+                      <div className="p-2.5 rounded-xl border border-primary/20 bg-primary/5 flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 text-xs text-primary font-medium">
+                          <Sparkles className="h-3.5 w-3.5" /> Quick Presets:
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => addVariantRow("250ml", "Bottle", true)}
+                            className="text-[11px] px-2 py-0.5 rounded-lg border border-primary/30 bg-background hover:bg-primary/10 text-foreground transition-colors font-medium cursor-pointer"
+                          >
+                            + 250ml Bottle (Retail)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => addVariantRow("1000ml (1L)", "Pump Bottle", false)}
+                            className="text-[11px] px-2 py-0.5 rounded-lg border border-primary/30 bg-background hover:bg-primary/10 text-foreground transition-colors font-medium cursor-pointer"
+                          >
+                            + 1000ml Backbar (Pump)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => addVariantRow("500ml", "Bottle", true)}
+                            className="text-[11px] px-2 py-0.5 rounded-lg border border-primary/30 bg-background hover:bg-primary/10 text-foreground transition-colors font-medium cursor-pointer"
+                          >
+                            + 500ml Bottle
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => addVariantRow("60ml", "Tube", true)}
+                            className="text-[11px] px-2 py-0.5 rounded-lg border border-primary/30 bg-background hover:bg-primary/10 text-foreground transition-colors font-medium cursor-pointer"
+                          >
+                            + 60ml Tube
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => addVariantRow("100ml", "Jar", true)}
+                            className="text-[11px] px-2 py-0.5 rounded-lg border border-primary/30 bg-background hover:bg-primary/10 text-foreground transition-colors font-medium cursor-pointer"
+                          >
+                            + 100ml Jar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => addVariantRow("Custom", "Bottle", true)}
+                            className="text-[11px] px-2 py-0.5 rounded-lg bg-foreground text-background hover:bg-foreground/90 transition-colors font-medium flex items-center gap-1 cursor-pointer"
+                          >
+                            <Plus className="h-3 w-3" /> Add Row
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Variant Matrix Table */}
+                      <div className="border border-border rounded-xl overflow-hidden shadow-xs">
+                        <div className="max-h-[280px] overflow-y-auto">
+                          <table className="w-full text-left text-xs border-collapse">
+                            <thead className="bg-muted/60 text-muted-foreground uppercase tracking-wider text-[10px] sticky top-0 backdrop-blur-xs z-10 border-b border-border">
+                              <tr>
+                                <th className="p-2 pl-3 font-semibold">Size / Volume</th>
+                                <th className="p-2 font-semibold">Container Type</th>
+                                <th className="p-2 font-semibold">SKU Code</th>
+                                <th className="p-2 font-semibold w-20">Cost (रु)</th>
+                                <th className="p-2 font-semibold w-20">Retail (रु)</th>
+                                <th className="p-2 font-semibold w-16 text-center">Stock</th>
+                                <th className="p-2 font-semibold text-center w-24">Type</th>
+                                <th className="p-2 font-semibold w-14 text-center">Alert</th>
+                                <th className="p-2 pr-3 w-8 text-center"></th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border/60 bg-background">
+                              {variantRows.map((v) => (
+                                <tr key={v.id} className="hover:bg-muted/30 transition-colors">
+                                  <td className="p-2 pl-3">
+                                    <Input
+                                      value={v.size}
+                                      onChange={(e) => updateVariantRow(v.id, "size", e.target.value)}
+                                      placeholder="e.g. 250ml"
+                                      className="h-8 text-xs font-medium"
+                                    />
+                                  </td>
+                                  <td className="p-2">
+                                    <Select
+                                      value={v.containerType}
+                                      onValueChange={(val) => updateVariantRow(v.id, "containerType", val)}
+                                    >
+                                      <SelectTrigger className="h-8 text-xs bg-background">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="Bottle">Bottle</SelectItem>
+                                        <SelectItem value="Pump Bottle">Pump Bottle</SelectItem>
+                                        <SelectItem value="Tube">Tube</SelectItem>
+                                        <SelectItem value="Jar">Jar</SelectItem>
+                                        <SelectItem value="Box">Box</SelectItem>
+                                        <SelectItem value="Can">Can</SelectItem>
+                                        <SelectItem value="Pack">Pack</SelectItem>
+                                        <SelectItem value="Packet">Packet</SelectItem>
+                                        <SelectItem value="Piece">Piece</SelectItem>
+                                        <SelectItem value="Refill">Refill</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </td>
+                                  <td className="p-2">
+                                    <Input
+                                      value={v.sku}
+                                      onChange={(e) => updateVariantRow(v.id, "sku", e.target.value)}
+                                      placeholder="e.g. OLP-250B"
+                                      className="h-8 text-xs font-mono"
+                                    />
+                                  </td>
+                                  <td className="p-2">
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      value={v.costPrice || ""}
+                                      onChange={(e) => updateVariantRow(v.id, "costPrice", Number(e.target.value))}
+                                      placeholder="Cost"
+                                      className="h-8 text-xs"
+                                    />
+                                  </td>
+                                  <td className="p-2">
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      disabled={!v.retail}
+                                      value={v.retail ? (v.sellingPrice || "") : 0}
+                                      onChange={(e) => updateVariantRow(v.id, "sellingPrice", Number(e.target.value))}
+                                      placeholder={v.retail ? "Price" : "Backbar"}
+                                      className={cn("h-8 text-xs", !v.retail && "opacity-50 bg-muted/40 cursor-not-allowed")}
+                                    />
+                                  </td>
+                                  <td className="p-2 text-center">
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      value={v.initialStock || ""}
+                                      onChange={(e) => updateVariantRow(v.id, "initialStock", Number(e.target.value))}
+                                      placeholder="0"
+                                      className="h-8 text-xs text-center px-1 font-semibold"
+                                    />
+                                  </td>
+                                  <td className="p-2 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => updateVariantRow(v.id, "retail", !v.retail)}
+                                      className={cn(
+                                        "text-[10px] font-semibold px-2 py-0.5 rounded-full border transition-all inline-flex items-center gap-1 cursor-pointer",
+                                        v.retail
+                                          ? "bg-[color-mix(in_oklab,var(--sage)_20%,white)] border-sage text-deep-olive"
+                                          : "bg-muted text-muted-foreground border-border"
+                                      )}
+                                    >
+                                      {v.retail ? "Retail" : "Backbar"}
+                                    </button>
+                                  </td>
+                                  <td className="p-2 text-center">
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      value={v.threshold || 5}
+                                      onChange={(e) => updateVariantRow(v.id, "threshold", Number(e.target.value))}
+                                      className="h-8 text-xs text-center px-1"
+                                    />
+                                  </td>
+                                  <td className="p-2 pr-3 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => removeVariantRow(v.id)}
+                                      disabled={variantRows.length <= 1}
+                                      className="text-muted-foreground hover:text-rose p-1 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                                      title="Remove variant"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
                     </div>
+                  )}
+
+                  <div className="flex gap-2 justify-end pt-2 border-t border-border">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setAddOpen(false)}
+                      className="rounded-xl text-xs"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      size="sm"
+                      className="rounded-xl bg-foreground text-background hover:bg-foreground/90 text-xs font-medium"
+                    >
+                      {hasVariants ? `Save ${variantRows.length} Variants to Catalog` : "Add to Catalog"}
+                    </Button>
                   </div>
-
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-muted-foreground">Initial Stock</label>
-                      <Input
-                        type="number"
-                        value={newInitialStock || ""}
-                        onChange={(e) => setNewInitialStock(Number(e.target.value))}
-                        className="border-border bg-background text-sm font-semibold"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-muted-foreground">Low Stock Alert</label>
-                      <Input
-                        type="number"
-                        value={newThreshold || ""}
-                        onChange={(e) => setNewThreshold(Number(e.target.value))}
-                        className="border-border bg-background text-sm"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-xs font-semibold text-muted-foreground">Expiry (YYYY-MM)</label>
-                      <Input
-                        placeholder="2027-08"
-                        value={newExpiry}
-                        onChange={(e) => setNewExpiry(e.target.value)}
-                        className="border-border bg-background text-sm"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between border-t border-border pt-3">
-                    <div>
-                      <div className="text-sm font-medium">Retail item</div>
-                      <div className="text-xs text-muted-foreground">Available for front desk checkout sales</div>
-                    </div>
-                    <Switch checked={newRetail} onCheckedChange={setNewRetail} />
-                  </div>
-
-                  <Button type="submit" className="w-full bg-primary text-primary-foreground hover:bg-primary/95 rounded-lg h-10 mt-2">
-                    Add to Catalog
-                  </Button>
                 </form>
               </DialogContent>
             </Dialog>

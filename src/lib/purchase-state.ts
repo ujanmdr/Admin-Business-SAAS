@@ -16,6 +16,11 @@ export interface PurchaseLineItem {
   qty: number;
   unit_cost_minor: number;
   line_total_minor: number;
+  unitType?: string;
+  packSize?: number;
+  totalUnits?: number;
+  category_id?: string;
+  category_name?: string;
 }
 
 export interface Purchase {
@@ -109,6 +114,8 @@ export const INITIAL_PURCHASES: Purchase[] = [
         qty: 12,
         unit_cost_minor: 120000,
         line_total_minor: 1440000,
+        category_id: "cat-1",
+        category_name: "Professional Hair Products",
       },
       {
         productId: "i10",
@@ -117,6 +124,8 @@ export const INITIAL_PURCHASES: Purchase[] = [
         qty: 6,
         unit_cost_minor: 190000,
         line_total_minor: 1140000,
+        category_id: "cat-5",
+        category_name: "Retail Line Inventory",
       },
     ],
   },
@@ -148,6 +157,8 @@ export const INITIAL_PURCHASES: Purchase[] = [
         qty: 24,
         unit_cost_minor: 200000,
         line_total_minor: 4800000,
+        category_id: "cat-1",
+        category_name: "Professional Hair Products",
       },
     ],
   },
@@ -178,6 +189,8 @@ export const INITIAL_PURCHASES: Purchase[] = [
         qty: 10,
         unit_cost_minor: 85000,
         line_total_minor: 850000,
+        category_id: "cat-4",
+        category_name: "Daily Consumables & Hygiene",
       },
     ],
   },
@@ -234,6 +247,37 @@ export function savePurchaseCategories(cats: PurchaseCategory[]) {
   localStorage.setItem(CATEGORIES_KEY, JSON.stringify(cats));
 }
 
+export function addPurchaseCategory(name: string): PurchaseCategory {
+  const cats = getPurchaseCategories();
+  const nextId = `cat-${Date.now().toString().slice(-4)}`;
+  const newCat: PurchaseCategory = {
+    id: nextId,
+    name: name.trim(),
+    position: cats.length + 1,
+    is_active: true,
+  };
+  cats.push(newCat);
+  savePurchaseCategories(cats);
+  return newCat;
+}
+
+export function updatePurchaseCategory(id: string, updates: Partial<PurchaseCategory>): PurchaseCategory | null {
+  const cats = getPurchaseCategories();
+  const idx = cats.findIndex((c) => c.id === id);
+  if (idx === -1) return null;
+  cats[idx] = { ...cats[idx], ...updates };
+  savePurchaseCategories(cats);
+  return cats[idx];
+}
+
+export function deletePurchaseCategory(id: string): boolean {
+  const cats = getPurchaseCategories();
+  const filtered = cats.filter((c) => c.id !== id);
+  if (filtered.length === cats.length) return false;
+  savePurchaseCategories(filtered);
+  return true;
+}
+
 // ── Purchases ───────────────────────────────────────────
 export function getPurchases(): Purchase[] {
   if (typeof window === "undefined") return INITIAL_PURCHASES;
@@ -279,7 +323,8 @@ export function addPurchase(data: Omit<Purchase, "id" | "purchase_number" | "cre
   if (newPurchase.status === "received") {
     for (const item of newPurchase.items) {
       if (item.productId && item.qty > 0) {
-        adjustProductStock(item.productId, item.qty, `Purchase receipt ${newPurchase.purchase_number}`);
+        const unitsToAdd = item.totalUnits || (item.qty * (item.packSize || 1));
+        adjustProductStock(item.productId, "Restock", unitsToAdd, `Purchase receipt ${newPurchase.purchase_number}`);
       }
     }
   }
@@ -287,20 +332,28 @@ export function addPurchase(data: Omit<Purchase, "id" | "purchase_number" | "cre
   return newPurchase;
 }
 
-export function updatePurchaseStatus(purchaseId: string, status: PurchaseStatus): Purchase | null {
+export function updatePurchaseStatus(
+  purchaseId: string,
+  status: PurchaseStatus,
+  referenceNumber?: string
+): Purchase | null {
   const purchases = getPurchases();
   const idx = purchases.findIndex((p) => p.id === purchaseId);
   if (idx === -1) return null;
 
   const prevStatus = purchases[idx].status;
   purchases[idx].status = status;
+  if (referenceNumber !== undefined && referenceNumber.trim()) {
+    purchases[idx].reference_number = referenceNumber.trim();
+  }
 
   if (status === "received" && prevStatus !== "received") {
     purchases[idx].received_at = new Date().toISOString();
     // Update inventory stock
     for (const item of purchases[idx].items) {
       if (item.productId && item.qty > 0) {
-        adjustProductStock(item.productId, item.qty, `Stock received from ${purchases[idx].purchase_number}`);
+        const unitsToAdd = item.totalUnits || (item.qty * (item.packSize || 1));
+        adjustProductStock(item.productId, "Restock", unitsToAdd, `Stock received from ${purchases[idx].purchase_number}`);
       }
     }
   }
@@ -421,7 +474,7 @@ export function recordPurchaseReturn(
   // Deduct returned stock from inventory
   for (const line of lines) {
     if (line.product_id && line.quantity > 0) {
-      adjustProductStock(line.product_id, -line.quantity, `Returned on ${purchases[pIdx].purchase_number}: ${reason}`);
+      adjustProductStock(line.product_id, "Adjustment (Decrease)", line.quantity, `Returned on ${purchases[pIdx].purchase_number}: ${reason}`);
     }
   }
 

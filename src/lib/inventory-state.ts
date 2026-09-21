@@ -208,3 +208,17 @@ export function getReorderSuggestions(): ReorderSuggestion[] {
       };
     });
 }
+
+export function updateProduct(productId: string, updates: Partial<Product>): Product | null {
+  const products = getInventoryProducts();
+  const idx = products.findIndex((p) => p.id === productId);
+  if (idx === -1) return null;
+  products[idx] = { ...products[idx], ...updates };
+  saveInventoryProducts(products);
+  return products[idx];
+}
+
+export function updateProductSupplier(productId: string, supplierId: string, supplierName: string): boolean {
+  const updated = updateProduct(productId, { supplierId, supplier: supplierName });
+  return !!updated;
+}
